@@ -38,7 +38,7 @@
 
           <div class="welcome-text">
             <p class="welcome-label">Welcom to</p>
-            <h1 class="welcome-title">BAU+<br/>Workshop <span>2026</span></h1>
+            <h1 class="welcome-title">BAU+<br/>Workshop<span>2026</span></h1>
             <p class="welcome-sub">Please register to confirm your attendance</p>
           </div>
 
@@ -97,6 +97,7 @@
                 type="text"
                 id="employee-id"
                 class="glass-input"
+                placeholder=""
                 maxlength="10"
                 autocomplete="off"
                 autocorrect="off"
@@ -105,11 +106,11 @@
               />
               <div class="input-status" id="id-status"></div>
             </div>
+            <p class="field-hint" id="id-hint">กรอกรหัส 3–10 ตัวอักษร</p>
           </div>
 
           <!-- Divider -->
-          <div class="divider">
-          </div>
+          <div class="divider"></div>
 
           <!-- Photo Field -->
           <div class="field-group" id="field-photo">
@@ -120,7 +121,7 @@
                   <path d="M5.5 3h5l1 1.5H13a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1v-6a1 1 0 011-1h1.5L5.5 3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
                 </svg>
               </span>
-              Take a photo for identity verification.
+              Take a photo for identity verification
             </label>
 
             <!-- Camera Area -->
@@ -185,12 +186,11 @@
                     บันทึกแล้ว
                   </div>
                 </div>
-                <button class="btn-retake" id="btn-retake">ถ่ายใหม่</button>
+                <button class="btn-retake" id="btn-retake">Retake photo</button>
               </div>
 
             </div>
             <canvas id="capture-canvas" style="display:none;"></canvas>
-            <p class="field-hint">ใช้กล้องหน้าเพื่อถ่ายรูปหน้าตรง</p>
           </div>
 
         </div>
@@ -198,12 +198,12 @@
         <!-- Submit -->
         <div class="submit-area">
           <button class="btn-submit" id="btn-submit" disabled>
-            <span id="submit-label">บันทึกการลงทะเบียน</span>
+            <span id="submit-label">Confirm registration</span>
             <div class="submit-loader hidden" id="submit-loader">
               <div class="spinner"></div>
             </div>
           </button>
-          <p class="submit-note">ข้อมูลของท่านจะถูกเก็บรักษาอย่างปลอดภัย</p>
+          <p class="submit-note">For your privacy, your photo will not be stored</p>
         </div>
 
       </div>
@@ -226,31 +226,31 @@
           </div>
 
           <div class="success-text">
-            <p class="success-label">ลงทะเบียนสำเร็จ</p>
-            <h2 class="success-name">ยินดีต้อนรับ!</h2>
+            <p class="success-label">Registration successful</p>
+            <h2 class="success-name">Wellcom!</h2>
             <p class="success-id" id="success-id-display"></p>
           </div>
 
           <div class="success-card">
             <div class="success-card-row">
-              <span class="card-key">รหัสพนักงาน</span>
+              <span class="card-key">Employee ID</span>
               <span class="card-val" id="card-employee-id">—</span>
             </div>
             <div class="success-card-row">
-              <span class="card-key">เวลาลงทะเบียน</span>
+              <span class="card-key">Registration time</span>
               <span class="card-val" id="card-time">—</span>
             </div>
             <div class="success-card-row">
-              <span class="card-key">สถานะ</span>
+              <span class="card-key">Status</span>
               <span class="card-val card-status">
                 <span class="status-dot"></span>
-                เข้าร่วมแล้ว
+                You have already joined the BAU+ Workshop 2026
               </span>
             </div>
           </div>
 
           <button class="btn-primary btn-done" id="btn-done">
-            <span>เสร็จสิ้น</span>
+            <span>Completed</span>
           </button>
 
         </div>
