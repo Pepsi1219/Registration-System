@@ -71,9 +71,9 @@ employeeInput.addEventListener('input', () => {
   if (val.length === 0) {
     setInputState('neutral');
   } else if (val.length < 3) {
-    setInputState('error', 'รหัสพนักงานต้องมีอย่างน้อย 3 ตัวอักษร');
+    setInputState('error', 'Employee code must be at least 3 characters');
   } else {
-    setInputState('valid', 'รหัสพนักงาน: ' + val.toUpperCase());
+    setInputState('valid', 'Employee ID: ' + val.toUpperCase());
   }
  
   updateProgress();
@@ -83,7 +83,7 @@ function setInputState(state, hint = null) {
   employeeInput.classList.remove('valid', 'error');
   idStatus.classList.remove('show-ok', 'show-err');
   idHint.classList.remove('error');
-  idHint.textContent = hint || 'กรอกรหัส 3–10 ตัวอักษร';
+  idHint.textContent = hint || 'Enter 3–10 character code';
  
   if (state === 'valid') {
     employeeInput.classList.add('valid');
@@ -497,3 +497,85 @@ employeeInput.addEventListener('keyup', (e) => {
   goTo('welcome');
   showCameraState('idle');
 })();
+
+const translations = {
+    'th': {
+        'welcome_title': 'ยินดีต้อนรับ',
+        'welcome_sub': 'โปรดลงทะเบียนเพื่อยืนยันการเข้าร่วมของคุณ',
+        'start_button': 'เริ่มลงทะเบียน',
+        'registration_title': 'การลงทะเบียน',
+        'employee_id_label': 'รหัสพนักงาน',
+        'photo_verification_text': 'ถ่ายรูปเพื่อยืนยันตัวตน',
+        'camera_idle_text': 'แตะเพื่อเปิดกล้อง',
+        'camera_sub_text': 'รองรับกล้องหน้าและกล้องหลัง',
+        'open_camera_text': 'เปิดกล้อง',
+        'retake_photo_text': 'ถ่ายรูปใหม่',
+        'confirm_registration_text': 'ยืนยันการลงทะเบียน',
+        'privacy_note_text': 'เพื่อความเป็นส่วนตัวของคุณ รูปภาพของคุณจะไม่ถูกจัดเก็บ',
+        'registration_success_text': 'การลงทะเบียนสำเร็จ',
+
+    },
+    'en': {
+        'welcome_title': 'welcome to',
+        'welcome_sub': 'Please register to confirm your attendance',
+        'start_button': 'Start registration',
+        'registration_title': 'Registration',
+        'employee_id_label': 'Employee ID',
+        'photo_verification_text': 'Take a photo for identity verification',
+        'camera_idle_text': 'Tab to open camera',
+        'camera_sub_text': 'Supports front camera · rear camera',
+        'open_camera_text': 'Open Camera',
+        'retake_photo_text': 'Retake photo',
+        'confirm_registration_text': 'Confirm registration',
+        'privacy_note_text': 'For your privacy, your photo will not be stored',
+        'registration_success_text': 'Registration successful',
+        
+       
+    },
+    'vn': {
+        'welcome_title': 'Chào mừng đến với',
+        'welcome_sub': 'Vui lòng đăng ký để xác nhận sự tham dự của bạn',
+        'start_button': 'Bắt đầu đăng ký',
+        'registration_title': 'Sự đăng ký',
+        'employee_id_label': 'Mã số nhân viên',
+        'photo_verification_text': 'Chụp ảnh để xác minh danh tính',
+        'camera_idle_text': 'Nhấn phím Tab để mở camera',
+        'camera_sub_text': 'Hỗ trợ camera trước · camera sau',
+        'open_camera_text': 'Mở camera',
+        'retake_photo_text': 'Chụp lại ảnh',
+        'confirm_registration_text': 'Xác nhận đăng ký',
+        'privacy_note_text': 'Để bảo vệ quyền riêng tư của bạn, ảnh của bạn sẽ không được lưu trữ.',
+        'registration_success_text': 'Đăng ký thành công',
+    },
+    'la': {
+        'welcome_title': 'ຍິນດີຕ້ອນຮັບສູ່',
+        'welcome_sub': 'ກະລຸນາລົງທະບຽນເພື່ອຢືນຢັນການເຂົ້າຮ່ວມຂອງທ່ານ',
+        'start_button': 'ເລີ່ມການລົງທະບຽນ',
+        'registration_title': 'ການລົງທະບຽນ',
+        'employee_id_label': 'ລະຫັດພະນັກງານ',
+        'photo_verification_text': 'ຖ່າຍຮູບເພື່ອຢືນຢັນຕົວຕົນ',
+        'camera_idle_text': 'ແທັບເພື່ອເປີດກ້ອງຖ່າຍຮູບ',
+        'camera_sub_text': 'ຮອງຮັບກ້ອງໜ້າ · ກ້ອງຫຼັງ',
+        'open_camera_text': 'ເປີດກ້ອງຖ່າຍຮູບ',
+        'retake_photo_text': 'ຖ່າຍຮູບຄືນໃໝ່',
+        'confirm_registration_text': 'ຢືນຢັນການລົງທະບຽນ',
+        'privacy_note_text': 'ເພື່ອຄວາມເປັນສ່ວນຕົວຂອງທ່ານ, ຮູບພາບຂອງທ່ານຈະບໍ່ຖືກບັນທຶກໄວ້',
+        'registration_success_text': 'ການລົງທະບຽນສຳເລັດແລ້ວ',
+    }
+};
+
+function changeLanguage(lang) {
+    // ดึง Element ทั้งหมดที่มีคลาส lang-text
+    const elements = document.querySelectorAll('.lang-text');
+    
+    elements.forEach(el => {
+        const key = el.getAttribute('data-key');
+        if (translations[lang] && translations[lang][key]) {
+            el.innerText = translations[lang][key];
+        }
+    });
+
+    // ปรับแต่งเพิ่มเติม: เปลี่ยนข้อความในปุ่มที่มีข้อความ
+    // (ถ้าคุณใส่ data-key ไว้ที่ปุ่มด้วย)
+    console.log("Language changed to: " + lang);
+}
