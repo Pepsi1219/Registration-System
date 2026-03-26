@@ -21,11 +21,21 @@
 
   <!-- App Container -->
   <div class="app">
-
     <!-- ===== SCREEN 1: WELCOME ===== -->
     <div class="screen" id="screen-welcome" data-screen="welcome">
       <div class="screen-inner">
         <div class="welcome-content">
+
+      <!-- ปุ่มเปลี่ยนภาษา -->
+          <div class="language-switcher">
+            <button type="button" class="lang-btn" onclick="changeLanguage('th')">🇹🇭</button>
+            <button type="button" class="lang-btn" onclick="changeLanguage('en')">🇺🇸</button>
+            <button type="button" class="lang-btn" onclick="changeLanguage('vn')">🇻🇳</button>
+            <button type="button" class="lang-btn" onclick="changeLanguage('la')">🇱🇦</button>
+          </div>
+
+
+          
           <div class="logo-wrap">
             <div class="logo-ring">
               <div class="logo-icon">
@@ -37,14 +47,14 @@
           </div>
 
           <div class="welcome-text">
-            <p class="welcome-label">Welcom to</p>
+            <p class="welcome-label lang-text" data-key="welcome_title">Welcome to</p>
             <h1 class="welcome-title">BAU+<br/>Workshop<span>2026</span></h1>
-            <p class="welcome-sub">Please register to confirm your attendance</p>
+            <p class="welcome-sub lang-text" data-key="welcome_sub">Please register to confirm your attendance</p>
           </div>
 
           <div class="welcome-actions">
             <button class="btn-primary" id="btn-start">
-              <span>Start registration</span>
+              <span class="lang-text" data-key="start_button">Start registration</span>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M4 10h12M10 4l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -68,7 +78,8 @@
             </svg>
           </button>
           <div class="header-title">
-            <h2>Registration</h2>
+            <h2><span class="lang-text" data-key="registration_title">Registration</span>
+            </h2>
           </div>
           <div class="header-spacer"></div>
         </div>
@@ -90,7 +101,7 @@
                   <path d="M5 8h6M5 5.5h3M5 10.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                 </svg>
               </span>
-              Employee ID
+              <span class="lang-text" data-key="employee_id_label">Employee ID</span>
             </label>
             <div class="input-wrap">
               <input
@@ -106,7 +117,7 @@
               />
               <div class="input-status" id="id-status"></div>
             </div>
-            <p class="field-hint" id="id-hint">กรอกรหัส 3–10 ตัวอักษร</p>
+            <p class="field-hint" id="id-hint">Enter 3–10 character code</p>
           </div>
 
           <!-- Divider -->
@@ -121,7 +132,7 @@
                   <path d="M5.5 3h5l1 1.5H13a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1v-6a1 1 0 011-1h1.5L5.5 3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
                 </svg>
               </span>
-              Take a photo for identity verification
+              <span class="lang-text" data-key="photo_verification_text">Take a photo for identity verification</span>
             </label>
 
             <!-- Camera Area -->
@@ -136,13 +147,18 @@
                     <circle cx="31" cy="17" r="1.5" fill="currentColor"/>
                   </svg>
                 </div>
-                <p class="camera-idle-text">Tab to open camera</p>
-                <p class="camera-idle-sub">Supports front camera · rear camera</p>
+                <p class="camera-idle-text">
+                  <span class="lang-text" data-key="camera_idle_text">Tab to open camera</span>
+</p>
+                <p class="camera-idle-sub">
+                  <span class="lang-text" data-key="camera_sub_text">Supports front camera · rear camera</span>
+</p>
                 <button class="btn-camera-open" id="btn-open-camera">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                     <path d="M9 3v12M3 9h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                   </svg>
-                  Open Camera
+                  <span class="lang-text" data-key="open_camera_text">Open Camera
+                  </span>
                 </button>
               </div>
 
@@ -186,7 +202,10 @@
                     บันทึกแล้ว
                   </div>
                 </div>
-                <button class="btn-retake" id="btn-retake">Retake photo</button>
+                <button class="btn-retake" id="btn-retake">
+                  <span class="lang-text" data-key="retake_photo_text">Retake photo
+                  </span>
+                </button>
               </div>
 
             </div>
@@ -198,12 +217,17 @@
         <!-- Submit -->
         <div class="submit-area">
           <button class="btn-submit" id="btn-submit" disabled>
-            <span id="submit-label">Confirm registration</span>
+            <span id="submit-label">
+              <span class="lang-text" data-key="confirm_registration_text">Confirm registration</span>
+            </span>
             <div class="submit-loader hidden" id="submit-loader">
               <div class="spinner"></div>
             </div>
           </button>
-          <p class="submit-note">For your privacy, your photo will not be stored</p>
+          <p class="submit-note">
+            <span class="lang-text" data-key="privacy_note_text">For your privacy, your photo will not be stored
+            </span>
+          </p>
         </div>
 
       </div>
@@ -226,10 +250,16 @@
           </div>
 
           <div class="success-text">
-            <p class="success-label">Registration successful</p>
-            <h2 class="success-name">Wellcom!</h2>
+            <p class="success-label">
+            <span class="lang-text" data-key="registration_success_text">Registration successful</span>
+            </p>
+            <h2 class="success-name">
+              <span class="lang-text" data-key="welcome_header">Welcome!</span>
+            </h2>
             <p class="success-id" id="success-id-display"></p>
           </div>
+
+          
 
           <div class="success-card">
             <div class="success-card-row">
