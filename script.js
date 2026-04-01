@@ -372,7 +372,7 @@ async function saveConfirmationCard() {
   // ── "ยินดีต้อนรับ!" ──────────────────────────────────────────
   ctx.font      = '200 34px Prompt, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.95)';
-  ctx.fillText('Wellcom!', W / 2, labelY + 46);
+  ctx.fillText('Welcome!', W / 2, labelY + 46);
  
   // ── Employee ID ──────────────────────────────────────────────
   ctx.font      = '300 15px Prompt, sans-serif';
