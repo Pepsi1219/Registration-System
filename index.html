@@ -24,19 +24,19 @@
 <body>
 
   <!-- Offline banner -->
-  <div class="offline-banner" id="offline-banner">
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+  <div class="offline-banner" id="offline-banner" role="status" aria-live="polite">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM8 4.7v3.6M8 10.8v.02" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
     </svg>
     <span class="lang-text" data-key="offline_banner">No internet connection</span>
   </div>
 
   <!-- Global Language Switcher (แสดงทุกหน้า) -->
-  <div class="language-switcher" id="language-switcher">
-    <button type="button" class="lang-btn" data-lang="th" onclick="changeLanguage('th')">🇹🇭</button>
-    <button type="button" class="lang-btn" data-lang="en" onclick="changeLanguage('en')">🇺🇸</button>
-    <button type="button" class="lang-btn" data-lang="vn" onclick="changeLanguage('vn')">🇻🇳</button>
-    <button type="button" class="lang-btn" data-lang="la" onclick="changeLanguage('la')">🇱🇦</button>
+  <div class="language-switcher" id="language-switcher" role="group" aria-label="Language">
+    <button type="button" class="lang-btn" data-lang="th" onclick="changeLanguage('th')" aria-label="ภาษาไทย">🇹🇭</button>
+    <button type="button" class="lang-btn" data-lang="en" onclick="changeLanguage('en')" aria-label="English">🇺🇸</button>
+    <button type="button" class="lang-btn" data-lang="vn" onclick="changeLanguage('vn')" aria-label="Tiếng Việt">🇻🇳</button>
+    <button type="button" class="lang-btn" data-lang="la" onclick="changeLanguage('la')" aria-label="ພາສາລາວ">🇱🇦</button>
   </div>
 
   <!-- Background Orbs -->
@@ -150,6 +150,7 @@
                 </svg>
               </span>
               <span class="lang-text" data-key="photo_verification_text">Take a photo for identity verification</span>
+              <span class="field-optional lang-text" data-key="optional_label">(optional)</span>
             </label>
 
             <!-- Camera Area -->
@@ -258,6 +259,7 @@
           <div class="success-avatar-wrap">
             <div class="success-avatar-ring">
               <img id="success-avatar" src="" alt="" />
+              <span class="avatar-fallback hidden" id="success-avatar-fallback"></span>
             </div>
             <div class="success-check">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -341,7 +343,7 @@
   </div>
 
   <!-- Error Toast -->
-  <div class="error-toast" id="error-toast"></div>
+  <div class="error-toast" id="error-toast" role="alert" aria-live="assertive"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="config.js"></script>

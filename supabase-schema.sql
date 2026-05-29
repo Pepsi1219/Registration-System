@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS employees (
 CREATE TABLE IF NOT EXISTS registrations (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id      UUID        NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  employee_id   TEXT        NOT NULL,
+  employee_id   TEXT        NOT NULL CHECK (char_length(employee_id) BETWEEN 3 AND 32),
   registered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (event_id, employee_id)
 );
@@ -92,16 +92,52 @@ CREATE POLICY "public_read_settings"  ON app_settings FOR SELECT USING (true);
 CREATE POLICY "admin_update_settings" ON app_settings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "admin_insert_settings" ON app_settings FOR INSERT TO authenticated WITH CHECK (true);
 
--- employees: ทุกคนอ่านได้ (whitelist check) / แอดมินจัดการได้
-CREATE POLICY "public_read_employees"  ON employees FOR SELECT USING (true);
+-- employees (whitelist มี PII: ชื่อ/แผนก) → ปิด public read, เหลือแค่แอดมิน
+-- ฝั่งลงทะเบียนเช็ค whitelist ผ่าน RPC is_whitelisted() แทน
+CREATE POLICY "admin_read_employees"   ON employees FOR SELECT TO authenticated USING (true);
 CREATE POLICY "admin_insert_employees" ON employees FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "admin_update_employees" ON employees FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "admin_delete_employees" ON employees FOR DELETE TO authenticated USING (true);
 
--- registrations: ทุกคนอ่าน + เพิ่มได้ / แอดมินลบได้
-CREATE POLICY "public_read_registrations"   ON registrations FOR SELECT USING (true);
+-- registrations: ปิด public read (กันดึงรายชื่อผู้มางานทั้งหมด)
+-- ฝั่งลงทะเบียนเช็คซ้ำผ่าน RPC get_registration_time() / เพิ่มได้ / แอดมินอ่าน+ลบ
 CREATE POLICY "public_insert_registrations" ON registrations FOR INSERT WITH CHECK (true);
+CREATE POLICY "admin_read_registrations"    ON registrations FOR SELECT TO authenticated USING (true);
 CREATE POLICY "admin_delete_registrations"  ON registrations FOR DELETE TO authenticated USING (true);
+
+
+-- ============================================================
+-- RPC — ให้ฝั่ง public (anon) เช็คได้โดยไม่ต้องเปิดอ่านทั้งตาราง
+-- SECURITY DEFINER: รันด้วยสิทธิ์เจ้าของฟังก์ชัน ข้าม RLS ของตาราง
+-- คืนค่าน้อยที่สุด (boolean / timestamp) ไม่รั่ว PII
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.is_whitelisted(p_event UUID, p_employee TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM employees
+    WHERE event_id = p_event AND employee_id = p_employee
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_registration_time(p_event UUID, p_employee TEXT)
+RETURNS TIMESTAMPTZ
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT registered_at FROM registrations
+  WHERE event_id = p_event AND employee_id = p_employee
+  LIMIT 1;
+$$;
+
+REVOKE ALL ON FUNCTION public.is_whitelisted(UUID, TEXT)        FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_registration_time(UUID, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_whitelisted(UUID, TEXT)        TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_registration_time(UUID, TEXT) TO anon, authenticated;
 
 
 -- ============================================================

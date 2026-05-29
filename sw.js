@@ -6,7 +6,7 @@
    - Supabase API / requests อื่น → network-only (ข้อมูลต้องสด, ห้าม cache)
    ============================================================ */
 
-const CACHE = 'checkin-shell-v2';
+const CACHE = 'checkin-shell-v3';
 
 const SHELL = [
   './',
@@ -53,6 +53,22 @@ self.addEventListener('fetch', (event) => {
   // อย่าแตะ Supabase หรือ cross-origin API — ต้องเป็นข้อมูลสดเสมอ
   if (url.hostname.includes('supabase') || url.pathname.includes('/rest/') || url.pathname.includes('/auth/')) {
     return; // ปล่อยให้ browser จัดการ network ตามปกติ
+  }
+
+  // config.js → network-first (credential เปลี่ยนแล้วได้ของใหม่ทันที, offline ค่อย fallback cache)
+  if (url.origin === self.location.origin && url.pathname.endsWith('config.js')) {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
   }
 
   // App shell + static (same-origin หรือ font/cdn) → cache-first

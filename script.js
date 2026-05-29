@@ -7,7 +7,15 @@
 // ════════════════════════════════════════════════════════════
 // SUPABASE CLIENT (credentials อยู่ใน config.js)
 // ════════════════════════════════════════════════════════════
-const db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+function isSupabaseConfigured() {
+  const u = window.SUPABASE_URL, k = window.SUPABASE_ANON_KEY;
+  return !!u && !!k && !u.includes('YOUR_') && !k.includes('YOUR_') && /^https?:\/\//.test(u);
+}
+
+// สร้าง client เฉพาะเมื่อตั้งค่าแล้ว (กัน createClient throw ตอน URL ไม่ถูกต้อง)
+const db = isSupabaseConfigured()
+  ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY)
+  : null;
 
 // ── State ────────────────────────────────────────────────────
 const state = {
@@ -118,10 +126,9 @@ function resetToWelcome() {
 
 // ── Progress ─────────────────────────────────────────────────
 function updateProgress() {
-  const hasId    = state.employeeId.trim().length >= 3;
-  const hasPhoto = !!state.photoDataUrl;
-  const pct = (hasId ? 50 : 0) + (hasPhoto ? 50 : 0);
-  progressFill.style.width = pct + '%';
+  // รูปถ่ายเป็น optional → progress วัดจาก Employee ID (ฟิลด์บังคับ) อย่างเดียว
+  const hasId = state.employeeId.trim().length >= 3;
+  progressFill.style.width = (hasId ? 100 : 0) + '%';
   checkSubmitReady();
 }
 
@@ -164,9 +171,8 @@ function setInputState(s, hint = null) {
 
 // ── Submit Gating ─────────────────────────────────────────────
 function checkSubmitReady() {
-  const ready = state.employeeId.trim().length >= 3
-             && !!state.photoDataUrl
-             && navigator.onLine;
+  // รูปถ่าย optional → ต้องการแค่ Employee ID + ออนไลน์
+  const ready = state.employeeId.trim().length >= 3 && navigator.onLine;
   submitBtn.disabled = !ready;
 }
 
@@ -245,42 +251,51 @@ function getEventName() {
   return `${l1} ${l2} ${yr}`;
 }
 
-// ── Supabase: Whitelist Check ─────────────────────────────────
+// ── Supabase: Whitelist Check (ผ่าน RPC — ไม่เปิดอ่านทั้งตาราง) ──
 async function checkWhitelist(employeeId) {
   if (!state.config?.whitelist_enabled) return { allowed: true };
 
-  const { data, error } = await db
-    .from('employees')
-    .select('employee_id, name')
-    .eq('event_id', state.eventId)
-    .eq('employee_id', employeeId)
-    .maybeSingle();
+  const { data, error } = await db.rpc('is_whitelisted', {
+    p_event: state.eventId,
+    p_employee: employeeId,
+  });
 
   if (error) throw error;
-  return data ? { allowed: true, name: data.name } : { allowed: false };
+  return { allowed: !!data };
 }
 
-// ── Supabase: Duplicate Check ─────────────────────────────────
+// ── Supabase: Duplicate Check (ผ่าน RPC) ──────────────────────
 async function checkDuplicate(employeeId) {
-  const { data, error } = await db
-    .from('registrations')
-    .select('employee_id, registered_at')
-    .eq('event_id', state.eventId)
-    .eq('employee_id', employeeId)
-    .maybeSingle();
+  const { data, error } = await db.rpc('get_registration_time', {
+    p_event: state.eventId,
+    p_employee: employeeId,
+  });
 
   if (error) throw error;
   return data
-    ? { duplicate: true, registeredAt: new Date(data.registered_at) }
+    ? { duplicate: true, registeredAt: new Date(data) }
     : { duplicate: false };
 }
 
 // ── Success Screen ────────────────────────────────────────────
 function populateSuccessScreen(employeeId, regDate, isAlreadyRegistered) {
+  // เก็บไว้ใช้ตอนสร้างการ์ดดาวน์โหลด (เวลา + สถานะที่ถูกต้อง)
+  state.success = { employeeId, registeredAt: regDate, already: isAlreadyRegistered };
+
   const timeStr = regDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
   const dateStr = regDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  $('success-avatar').src             = state.photoDataUrl;
+  // รูปเป็น optional → ถ้าไม่มีรูป แสดง placeholder เป็นตัวอักษรย่อ
+  const avatar   = $('success-avatar');
+  const fallback = $('success-avatar-fallback');
+  if (state.photoDataUrl) {
+    if (avatar)   { avatar.src = state.photoDataUrl; avatar.classList.remove('hidden'); }
+    if (fallback) fallback.classList.add('hidden');
+  } else {
+    if (avatar)   { avatar.removeAttribute('src'); avatar.classList.add('hidden'); }
+    if (fallback) { fallback.textContent = employeeId.slice(0, 2); fallback.classList.remove('hidden'); }
+  }
+
   $('success-id-display').textContent = (getTranslation('id_prefix') || 'ID: ') + employeeId;
   $('card-employee-id').textContent   = employeeId;
   $('card-time').textContent          = timeStr + ' · ' + dateStr;
@@ -323,6 +338,12 @@ function resetSubmitButton() {
 
 // ── Camera ────────────────────────────────────────────────────
 async function startCamera() {
+  // กล้องไม่รองรับ (เช่น desktop ไม่มีกล้อง) → ไม่เป็นทางตัน เพราะรูปเป็น optional
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showToastError(getTranslation('camera_unsupported') ||
+      'Camera not available on this device. The photo is optional — you can register without it.');
+    return;
+  }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: state.facingMode, width: { ideal: 1280 }, height: { ideal: 960 } },
@@ -336,7 +357,7 @@ async function startCamera() {
     console.error('Camera error:', err);
     showToastError(
       getTranslation('camera_error_text') ||
-      'Cannot access camera. Please allow camera permission in your browser.'
+      'Cannot access camera. The photo is optional — you can register without it.'
     );
   }
 }
@@ -435,7 +456,16 @@ async function handleSubmit() {
       .from('registrations')
       .insert({ employee_id: employeeId, event_id: state.eventId });
 
-    if (error) throw error;
+    if (error) {
+      // race condition: ลงทะเบียนซ้ำพอดี (unique violation) → ถือว่าสำเร็จแบบ already-registered
+      if (error.code === '23505') {
+        const dup2 = await checkDuplicate(employeeId);
+        populateSuccessScreen(employeeId, dup2.registeredAt || new Date(), true);
+        goTo('success');
+        return;
+      }
+      throw error;
+    }
 
     populateSuccessScreen(employeeId, new Date(), false);
     goTo('success');
@@ -465,11 +495,18 @@ function resetForm() {
 
 // ── Save Confirmation Card ────────────────────────────────────
 async function saveConfirmationCard() {
-  const idVal   = state.employeeId.trim().toUpperCase();
-  const now     = new Date();
-  const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
-  const dateStr = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+  // ใช้ข้อมูลที่บันทึกไว้ตอน success (เวลา + สถานะที่ถูกต้อง แม้เป็น already-registered)
+  const s = state.success || {
+    employeeId: state.employeeId.trim().toUpperCase(),
+    registeredAt: new Date(),
+    already: false,
+  };
+  const idVal   = (s.employeeId || '').toUpperCase();
+  const when    = s.registeredAt instanceof Date ? s.registeredAt : new Date(s.registeredAt || Date.now());
+  const timeStr = when.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const dateStr = when.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
   const eventStr = getEventName();
+  const t = (k, fb) => getTranslation(k) || fb;
 
   const W = 600, H = 760;
   const canvas = document.createElement('canvas');
@@ -531,12 +568,27 @@ async function saveConfirmationCard() {
   ctx.beginPath();
   ctx.arc(cx, cy, photoR, 0, Math.PI * 2);
   ctx.clip();
-  await new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => { ctx.drawImage(img, photoX, photoY, photoSize, photoSize); resolve(); };
-    img.onerror = resolve;
-    img.src = state.photoDataUrl;
-  });
+  if (state.photoDataUrl) {
+    await new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, photoX, photoY, photoSize, photoSize); resolve(); };
+      img.onerror = resolve;
+      img.src = state.photoDataUrl;
+    });
+  } else {
+    // ไม่มีรูป → วาด placeholder (gradient + ตัวอักษรย่อ)
+    const ph = ctx.createLinearGradient(photoX, photoY, photoX + photoSize, photoY + photoSize);
+    ph.addColorStop(0, '#5e9fff');
+    ph.addColorStop(1, '#a78bfa');
+    ctx.fillStyle = ph;
+    ctx.fillRect(photoX, photoY, photoSize, photoSize);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = '300 56px Prompt, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(idVal.slice(0, 2), cx, cy + 2);
+    ctx.textBaseline = 'alphabetic';
+  }
   ctx.restore();
 
   ctx.strokeStyle = 'rgba(255,255,255,0.18)';
@@ -556,21 +608,28 @@ async function saveConfirmationCard() {
   ctx.moveTo(bx - 9, by); ctx.lineTo(bx - 3, by + 7); ctx.lineTo(bx + 9, by - 7);
   ctx.stroke();
 
-  // Text labels
+  // Text labels (ตามภาษาที่เลือก)
   const labelY = photoY + photoSize + 36;
   ctx.textAlign = 'center';
   ctx.font = '300 13px Prompt, sans-serif';
   ctx.fillStyle = '#30d158';
   ctx.letterSpacing = '0.08em';
-  ctx.fillText('Registration successful', W / 2, labelY);
+  ctx.fillText(
+    s.already ? t('already_registered_text', 'Already registered')
+              : t('registration_success_text', 'Registration successful'),
+    W / 2, labelY
+  );
 
   ctx.font = '200 34px Prompt, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.95)';
-  ctx.fillText('Welcome!', W / 2, labelY + 46);
+  ctx.fillText(
+    s.already ? t('welcome_back_text', 'Welcome back!') : t('welcome_header', 'Welcome!'),
+    W / 2, labelY + 46
+  );
 
   ctx.font = '300 15px Prompt, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText('Employee ID: ' + idVal, W / 2, labelY + 78);
+  ctx.fillText(t('id_valid_prefix', 'Employee ID: ') + idVal, W / 2, labelY + 78);
 
   // Info card
   const cardX = 40, cardY = labelY + 106, cardW = W - 80, cardH = 140;
@@ -580,9 +639,9 @@ async function saveConfirmationCard() {
   roundRect(ctx, cardX + 0.5, cardY + 0.5, cardW - 1, cardH - 1, 18); ctx.stroke();
 
   const rows = [
-    { key: 'Employee ID',       val: idVal },
-    { key: 'Registration time', val: timeStr + ' · ' + dateStr },
-    { key: 'Status',            val: `✓ You have already joined the ${eventStr}` },
+    { key: t('card_employee_id', 'Employee ID'),  val: idVal },
+    { key: t('card_time', 'Registration time'),    val: timeStr + ' · ' + dateStr },
+    { key: t('card_status', 'Status'),             val: '✓ ' + t('status_joined_text', `You have already joined the ${eventStr}`) },
   ];
 
   rows.forEach((row, i) => {
@@ -608,7 +667,7 @@ async function saveConfirmationCard() {
   ctx.textAlign = 'center';
   ctx.fillText(eventStr, W / 2, H - 32);
 
-  const filename = `checkin_${idVal}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.jpg`;
+  const filename = `checkin_${idVal}_${when.getFullYear()}${String(when.getMonth()+1).padStart(2,'0')}${String(when.getDate()).padStart(2,'0')}_${String(when.getHours()).padStart(2,'0')}${String(when.getMinutes()).padStart(2,'0')}.jpg`;
   const link = document.createElement('a');
   link.href     = canvas.toDataURL('image/jpeg', 0.92);
   link.download = filename;
@@ -700,7 +759,9 @@ const translations = {
     'status_joined_text':        'คุณได้เข้าร่วมงานแล้ว',
     'whitelist_error':           'ไม่พบรหัสพนักงานในรายชื่อผู้เข้าร่วม',
     'submit_error':              'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง',
-    'camera_error_text':         'ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้กล้องในเบราว์เซอร์',
+    'camera_error_text':         'ไม่สามารถเข้าถึงกล้องได้ — รูปไม่บังคับ ลงทะเบียนได้โดยไม่ต้องมีรูป',
+    'camera_unsupported':        'อุปกรณ์นี้ไม่มีกล้อง — รูปไม่บังคับ ลงทะเบียนได้เลย',
+    'optional_label':            '(ไม่บังคับ)',
     'closed_title':              'ปิดรับการลงทะเบียน',
     'closed_sub':                'กิจกรรมสิ้นสุดแล้ว ขอบคุณที่เข้าร่วม',
     'photo_saved_text':          'บันทึกแล้ว',
@@ -738,7 +799,9 @@ const translations = {
     'status_joined_text':        'You have already joined the event',
     'whitelist_error':           'Employee ID not found in the attendee list.',
     'submit_error':              'Registration failed. Please try again.',
-    'camera_error_text':         'Cannot access camera. Please allow camera permission in your browser.',
+    'camera_error_text':         'Cannot access camera — the photo is optional, you can register without it.',
+    'camera_unsupported':        'Camera not available on this device — the photo is optional.',
+    'optional_label':            '(optional)',
     'closed_title':              'Registration Closed',
     'closed_sub':                'This event has concluded. Thank you for participating.',
     'photo_saved_text':          'Saved',
@@ -776,7 +839,9 @@ const translations = {
     'status_joined_text':        'Bạn đã tham gia sự kiện',
     'whitelist_error':           'Mã nhân viên không có trong danh sách người tham dự.',
     'submit_error':              'Đăng ký thất bại. Vui lòng thử lại.',
-    'camera_error_text':         'Không thể truy cập camera. Vui lòng cho phép quyền truy cập camera trong trình duyệt.',
+    'camera_error_text':         'Không thể truy cập camera — ảnh là tùy chọn, bạn có thể đăng ký mà không cần ảnh.',
+    'camera_unsupported':        'Thiết bị không có camera — ảnh là tùy chọn.',
+    'optional_label':            '(tùy chọn)',
     'closed_title':              'Đã đóng đăng ký',
     'closed_sub':                'Sự kiện đã kết thúc. Cảm ơn bạn đã tham gia.',
     'photo_saved_text':          'Đã lưu',
@@ -814,7 +879,9 @@ const translations = {
     'status_joined_text':        'ທ່ານໄດ້ເຂົ້າຮ່ວມງານແລ້ວ',
     'whitelist_error':           'ບໍ່ພົບລະຫັດພະນັກງານໃນລາຍຊື່ຜູ້ເຂົ້າຮ່ວມ',
     'submit_error':              'ການລົງທະບຽນລ້ມເຫຼວ. ກະລຸນາລອງໃໝ່.',
-    'camera_error_text':         'ບໍ່ສາມາດເຂົ້າຫາກ້ອງໄດ້. ກະລຸນາອະນຸຍາດໃຫ້ໃຊ້ກ້ອງໃນບຣາວເຊີ',
+    'camera_error_text':         'ບໍ່ສາມາດເຂົ້າຫາກ້ອງໄດ້ — ຮູບບໍ່ບັງຄັບ, ລົງທະບຽນໄດ້ໂດຍບໍ່ມີຮູບ.',
+    'camera_unsupported':        'ອຸປະກອນນີ້ບໍ່ມີກ້ອງ — ຮູບບໍ່ບັງຄັບ.',
+    'optional_label':            '(ບໍ່ບັງຄັບ)',
     'closed_title':              'ປິດຮັບການລົງທະບຽນ',
     'closed_sub':                'ກິດຈະກຳສິ້ນສຸດແລ້ວ. ຂອບໃຈທີ່ເຂົ້າຮ່ວມ.',
     'photo_saved_text':          'ບັນທຶກແລ້ວ',
@@ -912,5 +979,19 @@ function registerServiceWorker() {
   updateOnlineStatus();
   showCameraState('idle');
   registerServiceWorker();
+
+  if (!db) { showConfigError(); return; }
   loadEvent();
 })();
+
+// แสดงข้อความเมื่อยังไม่ได้ตั้งค่า config.js (กันจอเปล่า/ค้าง loading)
+function showConfigError() {
+  const overlay = $('loading-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('fade-out');
+  overlay.innerHTML =
+    '<div class="config-error">' +
+      '<p class="config-error-title">⚙️ ยังไม่ได้ตั้งค่า Supabase</p>' +
+      '<p class="config-error-sub">เปิดไฟล์ <code>config.js</code> แล้วใส่ <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> จาก Supabase → Project Settings → API</p>' +
+    '</div>';
+}

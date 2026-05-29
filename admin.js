@@ -4,9 +4,27 @@
 
 'use strict';
 
-const db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+function isSupabaseConfigured() {
+  const u = window.SUPABASE_URL, k = window.SUPABASE_ANON_KEY;
+  return !!u && !!k && !u.includes('YOUR_') && !k.includes('YOUR_') && /^https?:\/\//.test(u);
+}
+
+const db = isSupabaseConfigured()
+  ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY)
+  : null;
 
 const $ = (id) => document.getElementById(id);
+
+// ยังไม่ได้ตั้งค่า config.js → แจ้งที่หน้า login แล้วหยุด
+if (!db) {
+  const err = $('login-error');
+  if (err) {
+    err.textContent = 'ยังไม่ได้ตั้งค่า config.js — ใส่ SUPABASE_URL และ SUPABASE_ANON_KEY ก่อน';
+    err.classList.remove('hidden');
+  }
+  const btn = $('login-btn');
+  if (btn) btn.disabled = true;
+}
 
 const state = {
   events:          [],
@@ -15,7 +33,10 @@ const state = {
   registrations:   [],
   whitelist:       [],
   regChannel:      null,
+  showAllRegs:     false,
 };
+
+const REG_RENDER_LIMIT = 100;
 
 const selectedEvent = () => state.events.find(e => e.id === state.selectedEventId) || null;
 const eventName = (e) => e ? `${e.event_title_line1} ${e.event_title_line2} ${e.event_year}` : '—';
@@ -57,10 +78,12 @@ $('login-form').addEventListener('submit', async (e) => {
 
 $('logout-btn').addEventListener('click', async () => { await db.auth.signOut(); });
 
-db.auth.onAuthStateChange((_event, session) => {
-  if (session) showDashboard(session);
-  else showLogin();
-});
+if (db) {
+  db.auth.onAuthStateChange((_event, session) => {
+    if (session) showDashboard(session);
+    else showLogin();
+  });
+}
 
 function showLogin() {
   $('admin-login').classList.remove('hidden');
@@ -117,6 +140,7 @@ $('event-select').addEventListener('change', (e) => selectEvent(e.target.value))
 
 async function selectEvent(eventId) {
   state.selectedEventId = eventId || null;
+  state.showAllRegs = false; // รีเซ็ตการแสดงผลเมื่อสลับงาน
   if (!state.selectedEventId) {
     toast('ยังไม่มีงาน — กด "New event" เพื่อสร้าง', 'error');
     return;
@@ -347,8 +371,12 @@ function renderRegistrations() {
   empty.classList.toggle('hidden', list.length > 0);
   empty.textContent = (list.length === 0 && filter) ? 'ไม่พบผลการค้นหา' : 'ยังไม่มีการลงทะเบียน';
 
+  // จำกัดจำนวนแถวที่ render (กันอืดเมื่อมีผู้ลงทะเบียนเยอะ)
+  const total   = list.length;
+  const limited = state.showAllRegs ? list : list.slice(0, REG_RENDER_LIMIT);
+
   tbody.innerHTML = '';
-  list.forEach((reg, i) => {
+  limited.forEach((reg, i) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${i + 1}</td>
@@ -359,9 +387,18 @@ function renderRegistrations() {
     tr.querySelector('button').addEventListener('click', () => deleteRegistration(reg.employee_id));
     tbody.appendChild(tr);
   });
+
+  const moreBtn = $('reg-show-all');
+  if (total > REG_RENDER_LIMIT && !state.showAllRegs) {
+    moreBtn.classList.remove('hidden');
+    moreBtn.textContent = `แสดงทั้งหมด (${total})`;
+  } else {
+    moreBtn.classList.add('hidden');
+  }
 }
 
 $('reg-search').addEventListener('input', renderRegistrations);
+$('reg-show-all').addEventListener('click', () => { state.showAllRegs = true; renderRegistrations(); });
 
 async function deleteRegistration(id) {
   if (!confirm(`ลบการลงทะเบียนของ ${id}?`)) return;
