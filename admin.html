@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin · Event Check-in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+
+  <!-- Background Orbs -->
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- ===== LOGIN ===== -->
+  <div class="admin-login" id="admin-login">
+    <div class="login-card">
+      <div class="login-logo">
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+          <path d="M16 4C9.373 4 4 9.373 4 16s5.373 12 12 12 12-5.373 12-12S22.627 4 16 4zm0 5a3 3 0 110 6 3 3 0 010-6zm0 14.5c-3.315 0-6.26-1.694-8-4.264.04-2.652 5.334-4.111 8-4.111 2.654 0 7.96 1.459 8 4.111-1.74 2.57-4.685 4.264-8 4.264z" fill="currentColor"/>
+        </svg>
+      </div>
+      <h1 class="login-title">Admin Login</h1>
+      <p class="login-sub">Event Check-in Management</p>
+
+      <form id="login-form" class="login-form">
+        <div class="admin-field">
+          <label class="admin-label">Email</label>
+          <input type="email" id="login-email" class="admin-input" autocomplete="username" required />
+        </div>
+        <div class="admin-field">
+          <label class="admin-label">Password</label>
+          <input type="password" id="login-password" class="admin-input" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="admin-btn admin-btn-primary" id="login-btn">
+          <span id="login-btn-label">Sign in</span>
+          <div class="admin-spinner hidden" id="login-spinner"></div>
+        </button>
+        <p class="login-error hidden" id="login-error"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div class="admin-dashboard hidden" id="admin-dashboard">
+
+    <!-- Top bar -->
+    <header class="admin-header">
+      <div class="admin-header-left">
+        <div class="admin-header-logo">
+          <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+            <path d="M16 4C9.373 4 4 9.373 4 16s5.373 12 12 12 12-5.373 12-12S22.627 4 16 4z" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="admin-title">Dashboard</h1>
+          <p class="admin-subtitle" id="header-event-name">Event Check-in</p>
+        </div>
+      </div>
+      <div class="admin-header-right">
+        <span class="admin-user-email" id="admin-user-email"></span>
+        <button class="admin-btn admin-btn-ghost" id="logout-btn">Sign out</button>
+      </div>
+    </header>
+
+    <main class="admin-main">
+
+      <!-- Stats -->
+      <section class="stat-grid">
+        <div class="stat-card">
+          <p class="stat-label">Registered</p>
+          <p class="stat-value" id="stat-registered">—</p>
+          <div class="stat-live"><span class="stat-live-dot"></span>Live</div>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Whitelist total</p>
+          <p class="stat-value" id="stat-whitelist">—</p>
+          <p class="stat-foot" id="stat-whitelist-foot">Whitelist off</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Attendance rate</p>
+          <p class="stat-value" id="stat-rate">—</p>
+          <p class="stat-foot">of whitelist</p>
+        </div>
+      </section>
+
+      <!-- Event Config -->
+      <section class="admin-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Event Configuration</h2>
+          <button class="admin-btn admin-btn-primary admin-btn-sm" id="save-config-btn">
+            <span id="save-config-label">Save</span>
+            <div class="admin-spinner hidden" id="save-config-spinner"></div>
+          </button>
+        </div>
+        <div class="config-grid">
+          <div class="admin-field">
+            <label class="admin-label">Title line 1</label>
+            <input type="text" id="cfg-title1" class="admin-input" />
+          </div>
+          <div class="admin-field">
+            <label class="admin-label">Title line 2</label>
+            <input type="text" id="cfg-title2" class="admin-input" />
+          </div>
+          <div class="admin-field">
+            <label class="admin-label">Year</label>
+            <input type="text" id="cfg-year" class="admin-input" />
+          </div>
+          <div class="admin-field">
+            <label class="admin-label">Location</label>
+            <input type="text" id="cfg-location" class="admin-input" />
+          </div>
+          <div class="admin-field config-span">
+            <label class="admin-label">Date</label>
+            <input type="text" id="cfg-date" class="admin-input" />
+          </div>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-item">
+            <div>
+              <p class="toggle-name">Registration open</p>
+              <p class="toggle-desc">ปิดเพื่อแสดงหน้า "ปิดรับลงทะเบียน"</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="cfg-open" />
+              <span class="switch-track"></span>
+            </label>
+          </div>
+          <div class="toggle-item">
+            <div>
+              <p class="toggle-name">Whitelist enabled</p>
+              <p class="toggle-desc">เปิดเพื่อรับเฉพาะ ID ในรายชื่อ</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="cfg-whitelist" />
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Whitelist -->
+      <section class="admin-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Whitelist <span class="panel-count" id="wl-count">0</span></h2>
+        </div>
+        <div class="wl-add-row">
+          <input type="text" id="wl-id" class="admin-input" placeholder="Employee ID" />
+          <input type="text" id="wl-name" class="admin-input" placeholder="Name (optional)" />
+          <input type="text" id="wl-dept" class="admin-input" placeholder="Dept (optional)" />
+          <button class="admin-btn admin-btn-primary admin-btn-sm" id="wl-add-btn">Add</button>
+        </div>
+        <details class="wl-import">
+          <summary>Bulk import (CSV / one ID per line)</summary>
+          <p class="wl-import-hint">รูปแบบ: <code>EMP001,ชื่อ,แผนก</code> หรือใส่แค่ ID ก็ได้ — บรรทัดละ 1 คน</p>
+          <textarea id="wl-bulk" class="admin-textarea" rows="5" placeholder="EMP001,สมชาย,ฝ่ายผลิต&#10;EMP002,สมหญิง,ฝ่ายบุคคล&#10;EMP003"></textarea>
+          <button class="admin-btn admin-btn-secondary admin-btn-sm" id="wl-import-btn">Import</button>
+        </details>
+        <div class="admin-table-wrap">
+          <table class="admin-table" id="wl-table">
+            <thead>
+              <tr><th>Employee ID</th><th>Name</th><th>Dept</th><th></th></tr>
+            </thead>
+            <tbody id="wl-tbody"></tbody>
+          </table>
+          <p class="admin-empty hidden" id="wl-empty">ยังไม่มีรายชื่อใน whitelist</p>
+        </div>
+      </section>
+
+      <!-- Registrations -->
+      <section class="admin-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Registrations <span class="panel-count" id="reg-count">0</span></h2>
+          <div class="panel-head-actions">
+            <input type="text" id="reg-search" class="admin-input admin-input-sm" placeholder="Search ID…" />
+            <button class="admin-btn admin-btn-secondary admin-btn-sm" id="export-btn">Export CSV</button>
+          </div>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table" id="reg-table">
+            <thead>
+              <tr><th>#</th><th>Employee ID</th><th>Registered at</th><th></th></tr>
+            </thead>
+            <tbody id="reg-tbody"></tbody>
+          </table>
+          <p class="admin-empty hidden" id="reg-empty">ยังไม่มีการลงทะเบียน</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div class="admin-toast" id="admin-toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,20 +1,48 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title>Closed</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Registration Closed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@200;300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body style="
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  height:100vh;
-  background:#090a1a;
-  color:white;
-  font-family:sans-serif;
-  flex-direction:column;
-">
-  <h1>The event has now concluded.</h1>
-  <p>ขณะนี้กิจกรรมสิ้นสุดแล้ว</p>
+<body>
+
+  <!-- Background Orbs -->
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <div class="app">
+    <div class="screen" data-screen="closed">
+      <div class="screen-inner">
+        <div class="closed-content">
+
+          <div class="closed-icon-wrap">
+            <div class="closed-icon-ring">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <rect x="7" y="14" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M11 14v-4a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="16" cy="21" r="1.5" fill="currentColor"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="closed-text">
+            <p class="closed-label">The event has now concluded</p>
+            <p class="closed-sub">ขณะนี้กิจกรรมสิ้นสุดแล้ว ขอบคุณที่เข้าร่วม</p>
+            <p class="closed-event">BAU+ Workshop 2026</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

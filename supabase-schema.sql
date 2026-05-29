@@ -75,3 +75,51 @@ CREATE POLICY "public_read_registrations"
 
 CREATE POLICY "public_insert_registrations"
   ON registrations FOR INSERT WITH CHECK (true);
+
+
+-- ============================================================
+-- Admin Policies (สำหรับผู้ใช้ที่ login ผ่าน Supabase Auth)
+-- authenticated user แก้ config / จัดการ whitelist / ลบ registration ได้
+-- ============================================================
+
+-- event_config: แอดมินแก้ไขได้
+CREATE POLICY "admin_update_event_config"
+  ON event_config FOR UPDATE TO authenticated
+  USING (true) WITH CHECK (true);
+
+CREATE POLICY "admin_insert_event_config"
+  ON event_config FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+-- employees: แอดมินเพิ่ม / ลบ whitelist ได้
+CREATE POLICY "admin_insert_employees"
+  ON employees FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "admin_update_employees"
+  ON employees FOR UPDATE TO authenticated
+  USING (true) WITH CHECK (true);
+
+CREATE POLICY "admin_delete_employees"
+  ON employees FOR DELETE TO authenticated
+  USING (true);
+
+-- registrations: แอดมินลบได้ (เผื่อแก้ไขข้อมูลผิด)
+CREATE POLICY "admin_delete_registrations"
+  ON registrations FOR DELETE TO authenticated
+  USING (true);
+
+
+-- ============================================================
+-- Realtime
+-- เปิด realtime ให้ตาราง registrations เพื่อให้ dashboard
+-- อัปเดตยอดทันทีเมื่อมีคนลงทะเบียน
+-- ============================================================
+ALTER PUBLICATION supabase_realtime ADD TABLE registrations;
+
+
+-- ============================================================
+-- สร้างบัญชีแอดมิน:
+--   Supabase Dashboard → Authentication → Users → "Add user"
+--   กรอก email + password → ใช้ login ที่หน้า admin.html
+-- ============================================================
