@@ -61,7 +61,7 @@
         </div>
         <div>
           <h1 class="admin-title">Dashboard</h1>
-          <p class="admin-subtitle" id="header-event-name">Event Check-in</p>
+          <p class="admin-subtitle">Multi-event Check-in</p>
         </div>
       </div>
       <div class="admin-header-right">
@@ -71,6 +71,23 @@
     </header>
 
     <main class="admin-main">
+
+      <!-- Event Switcher -->
+      <section class="admin-panel event-bar">
+        <div class="event-bar-row">
+          <div class="event-select-wrap">
+            <label class="admin-label">Viewing event</label>
+            <select id="event-select" class="admin-select"></select>
+          </div>
+          <div class="event-bar-actions">
+            <span class="active-badge hidden" id="active-badge">● Active</span>
+            <button class="admin-btn admin-btn-secondary admin-btn-sm" id="set-active-btn">Set as active</button>
+            <button class="admin-btn admin-btn-primary admin-btn-sm" id="new-event-btn">+ New event</button>
+            <button class="admin-btn admin-btn-danger-lg admin-btn-sm" id="delete-event-btn">Delete</button>
+          </div>
+        </div>
+        <p class="event-bar-hint" id="event-link-hint"></p>
+      </section>
 
       <!-- Stats -->
       <section class="stat-grid">
@@ -191,6 +208,27 @@
             <tbody id="reg-tbody"></tbody>
           </table>
           <p class="admin-empty hidden" id="reg-empty">ยังไม่มีการลงทะเบียน</p>
+        </div>
+      </section>
+
+      <!-- Employee Lookup (cross-event history) -->
+      <section class="admin-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Employee Lookup</h2>
+        </div>
+        <p class="lookup-desc">ค้นว่าพนักงานคนนี้เคยลงทะเบียนงานไหนบ้าง (ข้ามทุกงาน)</p>
+        <div class="lookup-row">
+          <input type="text" id="lookup-id" class="admin-input" placeholder="Employee ID" />
+          <button class="admin-btn admin-btn-primary admin-btn-sm" id="lookup-btn">Search</button>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table hidden" id="lookup-table">
+            <thead>
+              <tr><th>Event</th><th>Registered at</th></tr>
+            </thead>
+            <tbody id="lookup-tbody"></tbody>
+          </table>
+          <p class="admin-empty hidden" id="lookup-empty">ไม่พบประวัติการลงทะเบียน</p>
         </div>
       </section>
 

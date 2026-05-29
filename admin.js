@@ -1,5 +1,5 @@
 /* ============================================================
-   ADMIN DASHBOARD · admin.js
+   ADMIN DASHBOARD · admin.js (Multi-event)
    ============================================================ */
 
 'use strict';
@@ -9,11 +9,16 @@ const db = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANO
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  config:        null,
-  registrations: [],
-  whitelist:     [],
-  regChannel:    null,
+  events:          [],
+  activeEventId:   null,   // app_settings.active_event_id
+  selectedEventId: null,   // งานที่กำลังดูอยู่
+  registrations:   [],
+  whitelist:       [],
+  regChannel:      null,
 };
+
+const selectedEvent = () => state.events.find(e => e.id === state.selectedEventId) || null;
+const eventName = (e) => e ? `${e.event_title_line1} ${e.event_title_line2} ${e.event_year}` : '—';
 
 // ── Toast ─────────────────────────────────────────────────────
 let toastTimer = null;
@@ -48,28 +53,19 @@ $('login-form').addEventListener('submit', async (e) => {
     errEl.textContent = 'Login failed: ' + error.message;
     errEl.classList.remove('hidden');
   }
-  // onAuthStateChange จะจัดการเปลี่ยนหน้าเอง
 });
 
-$('logout-btn').addEventListener('click', async () => {
-  await db.auth.signOut();
-});
+$('logout-btn').addEventListener('click', async () => { await db.auth.signOut(); });
 
 db.auth.onAuthStateChange((_event, session) => {
-  if (session) {
-    showDashboard(session);
-  } else {
-    showLogin();
-  }
+  if (session) showDashboard(session);
+  else showLogin();
 });
 
 function showLogin() {
   $('admin-login').classList.remove('hidden');
   $('admin-dashboard').classList.add('hidden');
-  if (state.regChannel) {
-    db.removeChannel(state.regChannel);
-    state.regChannel = null;
-  }
+  unsubscribeRealtime();
 }
 
 async function showDashboard(session) {
@@ -78,31 +74,124 @@ async function showDashboard(session) {
   $('admin-user-email').textContent = session.user.email;
   $('login-form').reset();
 
-  await Promise.all([loadConfig(), loadWhitelist(), loadRegistrations()]);
+  await loadEvents();
+}
+
+// ── Events ────────────────────────────────────────────────────
+async function loadEvents() {
+  const [{ data: events, error: e1 }, { data: settings, error: e2 }] = await Promise.all([
+    db.from('events').select('*').order('created_at', { ascending: false }),
+    db.from('app_settings').select('active_event_id').eq('id', 1).maybeSingle(),
+  ]);
+
+  if (e1) { toast('โหลดงานไม่สำเร็จ: ' + e1.message, 'error'); return; }
+  if (e2) console.warn('settings load:', e2.message);
+
+  state.events = events || [];
+  state.activeEventId = settings?.active_event_id || null;
+
+  // เลือกงาน: คงงานเดิมถ้ายังมี → ไม่งั้นใช้ active → ไม่งั้นงานแรก
+  if (!state.events.some(e => e.id === state.selectedEventId)) {
+    state.selectedEventId = state.activeEventId && state.events.some(e => e.id === state.activeEventId)
+      ? state.activeEventId
+      : (state.events[0]?.id || null);
+  }
+
+  renderEventSelector();
+  await selectEvent(state.selectedEventId);
+}
+
+function renderEventSelector() {
+  const sel = $('event-select');
+  sel.innerHTML = '';
+  state.events.forEach((e) => {
+    const opt = document.createElement('option');
+    opt.value = e.id;
+    opt.textContent = eventName(e) + (e.id === state.activeEventId ? '  ●' : '');
+    sel.appendChild(opt);
+  });
+  sel.value = state.selectedEventId || '';
+}
+
+$('event-select').addEventListener('change', (e) => selectEvent(e.target.value));
+
+async function selectEvent(eventId) {
+  state.selectedEventId = eventId || null;
+  if (!state.selectedEventId) {
+    toast('ยังไม่มีงาน — กด "New event" เพื่อสร้าง', 'error');
+    return;
+  }
+
+  // active badge + link hint
+  const isActive = state.selectedEventId === state.activeEventId;
+  $('active-badge').classList.toggle('hidden', !isActive);
+  $('set-active-btn').disabled = isActive;
+
+  const origin = location.origin + location.pathname.replace(/admin\.html$/, 'index.html');
+  $('event-link-hint').textContent = `ลิงก์ลงทะเบียนงานนี้: ${origin}?event=${state.selectedEventId}`;
+
+  fillConfigForm(selectedEvent());
+  await Promise.all([loadWhitelist(), loadRegistrations()]);
   subscribeRealtime();
 }
 
+$('new-event-btn').addEventListener('click', async () => {
+  const { data, error } = await db.from('events').insert({
+    event_title_line1: 'New',
+    event_title_line2: 'Event',
+    event_year: String(new Date().getFullYear()),
+  }).select().single();
+
+  if (error) { toast('สร้างงานไม่สำเร็จ: ' + error.message, 'error'); return; }
+
+  state.selectedEventId = data.id;
+  await loadEvents();
+  toast('สร้างงานใหม่แล้ว — แก้รายละเอียดด้านล่างได้เลย', 'success');
+});
+
+$('set-active-btn').addEventListener('click', async () => {
+  if (!state.selectedEventId) return;
+  const { error } = await db.from('app_settings')
+    .update({ active_event_id: state.selectedEventId }).eq('id', 1);
+
+  if (error) { toast('ตั้ง active ไม่สำเร็จ: ' + error.message, 'error'); return; }
+
+  state.activeEventId = state.selectedEventId;
+  renderEventSelector();
+  $('event-select').value = state.selectedEventId;
+  $('active-badge').classList.remove('hidden');
+  $('set-active-btn').disabled = true;
+  toast('ตั้งงานนี้เป็น active แล้ว', 'success');
+});
+
+$('delete-event-btn').addEventListener('click', async () => {
+  const ev = selectedEvent();
+  if (!ev) return;
+  if (state.events.length <= 1) { toast('ต้องมีอย่างน้อย 1 งาน', 'error'); return; }
+  if (!confirm(`ลบงาน "${eventName(ev)}" และข้อมูลลงทะเบียน/whitelist ทั้งหมด?`)) return;
+
+  const { error } = await db.from('events').delete().eq('id', ev.id);
+  if (error) { toast('ลบงานไม่สำเร็จ: ' + error.message, 'error'); return; }
+
+  state.selectedEventId = null;
+  await loadEvents();
+  toast('ลบงานแล้ว', 'success');
+});
+
 // ── Config ────────────────────────────────────────────────────
-async function loadConfig() {
-  const { data, error } = await db.from('event_config').select('*').eq('id', 1).single();
-  if (error) { toast('โหลด config ไม่สำเร็จ: ' + error.message, 'error'); return; }
-
-  state.config = data;
-  $('cfg-title1').value   = data.event_title_line1 || '';
-  $('cfg-title2').value   = data.event_title_line2 || '';
-  $('cfg-year').value     = data.event_year || '';
-  $('cfg-location').value = data.event_location || '';
-  $('cfg-date').value     = data.event_date || '';
-  $('cfg-open').checked      = !!data.registration_open;
-  $('cfg-whitelist').checked = !!data.whitelist_enabled;
-
-  $('header-event-name').textContent =
-    `${data.event_title_line1} ${data.event_title_line2} ${data.event_year}`;
-
-  updateStats();
+function fillConfigForm(ev) {
+  if (!ev) return;
+  $('cfg-title1').value   = ev.event_title_line1 || '';
+  $('cfg-title2').value   = ev.event_title_line2 || '';
+  $('cfg-year').value     = ev.event_year || '';
+  $('cfg-location').value = ev.event_location || '';
+  $('cfg-date').value     = ev.event_date || '';
+  $('cfg-open').checked      = !!ev.registration_open;
+  $('cfg-whitelist').checked = !!ev.whitelist_enabled;
 }
 
 $('save-config-btn').addEventListener('click', async () => {
+  if (!state.selectedEventId) return;
   const btn = $('save-config-btn');
   $('save-config-label').classList.add('hidden');
   $('save-config-spinner').classList.remove('hidden');
@@ -118,28 +207,28 @@ $('save-config-btn').addEventListener('click', async () => {
     whitelist_enabled: $('cfg-whitelist').checked,
   };
 
-  const { error } = await db.from('event_config').update(payload).eq('id', 1);
+  const { error } = await db.from('events').update(payload).eq('id', state.selectedEventId);
 
   $('save-config-label').classList.remove('hidden');
   $('save-config-spinner').classList.add('hidden');
   btn.disabled = false;
 
-  if (error) {
-    toast('บันทึกไม่สำเร็จ: ' + error.message, 'error');
-  } else {
-    state.config = { ...state.config, ...payload };
-    $('header-event-name').textContent =
-      `${payload.event_title_line1} ${payload.event_title_line2} ${payload.event_year}`;
-    updateStats();
-    toast('บันทึก config แล้ว', 'success');
-  }
+  if (error) { toast('บันทึกไม่สำเร็จ: ' + error.message, 'error'); return; }
+
+  const ev = selectedEvent();
+  if (ev) Object.assign(ev, payload);
+  renderEventSelector();
+  $('event-select').value = state.selectedEventId;
+  updateStats();
+  toast('บันทึก config แล้ว', 'success');
 });
 
-// ── Whitelist ─────────────────────────────────────────────────
+// ── Whitelist (scoped to selected event) ──────────────────────
 async function loadWhitelist() {
   const { data, error } = await db
     .from('employees')
     .select('*')
+    .eq('event_id', state.selectedEventId)
     .order('employee_id', { ascending: true });
 
   if (error) { toast('โหลด whitelist ไม่สำเร็จ: ' + error.message, 'error'); return; }
@@ -151,19 +240,17 @@ async function loadWhitelist() {
 
 function renderWhitelist() {
   const tbody = $('wl-tbody');
-  const empty = $('wl-empty');
   $('wl-count').textContent = state.whitelist.length;
+  $('wl-empty').classList.toggle('hidden', state.whitelist.length > 0);
 
   tbody.innerHTML = '';
-  empty.classList.toggle('hidden', state.whitelist.length > 0);
-
   state.whitelist.forEach((emp) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-mono">${escapeHtml(emp.employee_id)}</td>
       <td>${escapeHtml(emp.name || '—')}</td>
       <td>${escapeHtml(emp.department || '—')}</td>
-      <td><button class="admin-btn admin-btn-danger" data-id="${escapeHtml(emp.employee_id)}">Delete</button></td>
+      <td><button class="admin-btn admin-btn-danger">Delete</button></td>
     `;
     tr.querySelector('button').addEventListener('click', () => deleteEmployee(emp.employee_id));
     tbody.appendChild(tr);
@@ -171,6 +258,7 @@ function renderWhitelist() {
 }
 
 $('wl-add-btn').addEventListener('click', async () => {
+  if (!state.selectedEventId) return;
   const id   = $('wl-id').value.trim().toUpperCase();
   const name = $('wl-name').value.trim();
   const dept = $('wl-dept').value.trim();
@@ -178,13 +266,14 @@ $('wl-add-btn').addEventListener('click', async () => {
   if (id.length < 3) { toast('Employee ID ต้องมีอย่างน้อย 3 ตัวอักษร', 'error'); return; }
 
   const { error } = await db.from('employees').insert({
+    event_id: state.selectedEventId,
     employee_id: id,
     name: name || null,
     department: dept || null,
   });
 
   if (error) {
-    toast(error.code === '23505' ? 'มี ID นี้อยู่แล้ว' : 'เพิ่มไม่สำเร็จ: ' + error.message, 'error');
+    toast(error.code === '23505' ? 'มี ID นี้ในงานนี้แล้ว' : 'เพิ่มไม่สำเร็จ: ' + error.message, 'error');
     return;
   }
 
@@ -194,6 +283,7 @@ $('wl-add-btn').addEventListener('click', async () => {
 });
 
 $('wl-import-btn').addEventListener('click', async () => {
+  if (!state.selectedEventId) return;
   const raw = $('wl-bulk').value.trim();
   if (!raw) { toast('กรุณาวางรายชื่อก่อน', 'error'); return; }
 
@@ -202,14 +292,18 @@ $('wl-import-btn').addEventListener('click', async () => {
     .filter(Boolean)
     .map(line => {
       const [id, name, dept] = line.split(',').map(s => (s || '').trim());
-      return { employee_id: (id || '').toUpperCase(), name: name || null, department: dept || null };
+      return {
+        event_id: state.selectedEventId,
+        employee_id: (id || '').toUpperCase(),
+        name: name || null,
+        department: dept || null,
+      };
     })
     .filter(r => r.employee_id.length >= 3);
 
   if (!rows.length) { toast('ไม่พบรายชื่อที่ถูกต้อง', 'error'); return; }
 
-  const { error } = await db.from('employees').upsert(rows, { onConflict: 'employee_id' });
-
+  const { error } = await db.from('employees').upsert(rows, { onConflict: 'event_id,employee_id' });
   if (error) { toast('Import ไม่สำเร็จ: ' + error.message, 'error'); return; }
 
   $('wl-bulk').value = '';
@@ -219,17 +313,19 @@ $('wl-import-btn').addEventListener('click', async () => {
 
 async function deleteEmployee(id) {
   if (!confirm(`ลบ ${id} ออกจาก whitelist?`)) return;
-  const { error } = await db.from('employees').delete().eq('employee_id', id);
+  const { error } = await db.from('employees').delete()
+    .eq('event_id', state.selectedEventId).eq('employee_id', id);
   if (error) { toast('ลบไม่สำเร็จ: ' + error.message, 'error'); return; }
   await loadWhitelist();
   toast('ลบแล้ว', 'success');
 }
 
-// ── Registrations ─────────────────────────────────────────────
+// ── Registrations (scoped to selected event) ──────────────────
 async function loadRegistrations() {
   const { data, error } = await db
     .from('registrations')
     .select('*')
+    .eq('event_id', state.selectedEventId)
     .order('registered_at', { ascending: false });
 
   if (error) { toast('โหลด registrations ไม่สำเร็จ: ' + error.message, 'error'); return; }
@@ -241,28 +337,24 @@ async function loadRegistrations() {
 
 function renderRegistrations() {
   const tbody  = $('reg-tbody');
-  const empty  = $('reg-empty');
   const filter = $('reg-search').value.trim().toUpperCase();
-
   const list = filter
     ? state.registrations.filter(r => r.employee_id.toUpperCase().includes(filter))
     : state.registrations;
 
   $('reg-count').textContent = state.registrations.length;
+  const empty = $('reg-empty');
+  empty.classList.toggle('hidden', list.length > 0);
+  empty.textContent = (list.length === 0 && filter) ? 'ไม่พบผลการค้นหา' : 'ยังไม่มีการลงทะเบียน';
 
   tbody.innerHTML = '';
-  empty.classList.toggle('hidden', list.length > 0);
-  if (list.length === 0 && filter) empty.textContent = 'ไม่พบผลการค้นหา';
-  else empty.textContent = 'ยังไม่มีการลงทะเบียน';
-
   list.forEach((reg, i) => {
-    const dt = new Date(reg.registered_at);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td class="col-mono">${escapeHtml(reg.employee_id)}</td>
-      <td>${formatDateTime(dt)}</td>
-      <td><button class="admin-btn admin-btn-danger" data-id="${escapeHtml(reg.employee_id)}">Delete</button></td>
+      <td>${formatDateTime(new Date(reg.registered_at))}</td>
+      <td><button class="admin-btn admin-btn-danger">Delete</button></td>
     `;
     tr.querySelector('button').addEventListener('click', () => deleteRegistration(reg.employee_id));
     tbody.appendChild(tr);
@@ -273,7 +365,8 @@ $('reg-search').addEventListener('input', renderRegistrations);
 
 async function deleteRegistration(id) {
   if (!confirm(`ลบการลงทะเบียนของ ${id}?`)) return;
-  const { error } = await db.from('registrations').delete().eq('employee_id', id);
+  const { error } = await db.from('registrations').delete()
+    .eq('event_id', state.selectedEventId).eq('employee_id', id);
   if (error) { toast('ลบไม่สำเร็จ: ' + error.message, 'error'); return; }
   await loadRegistrations();
   toast('ลบแล้ว', 'success');
@@ -285,14 +378,13 @@ $('export-btn').addEventListener('click', () => {
 
   const header = ['No', 'Employee ID', 'Registered At'];
   const lines = state.registrations.map((r, i) =>
-    [i + 1, r.employee_id, new Date(r.registered_at).toISOString()]
-      .map(csvCell).join(',')
+    [i + 1, r.employee_id, new Date(r.registered_at).toISOString()].map(csvCell).join(',')
   );
   const csv = '﻿' + [header.join(','), ...lines].join('\r\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
-  const name = (state.config?.event_title_line1 || 'event').replace(/\s+/g, '_');
+  const name = (selectedEvent()?.event_title_line1 || 'event').replace(/\s+/g, '_');
   const date = new Date().toISOString().slice(0, 10);
 
   const a = document.createElement('a');
@@ -308,25 +400,65 @@ function csvCell(val) {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-// ── Realtime ──────────────────────────────────────────────────
-function subscribeRealtime() {
-  if (state.regChannel) db.removeChannel(state.regChannel);
+// ── Employee Lookup (cross-event history) ─────────────────────
+$('lookup-btn').addEventListener('click', runLookup);
+$('lookup-id').addEventListener('keyup', (e) => { if (e.key === 'Enter') runLookup(); });
 
+async function runLookup() {
+  const id = $('lookup-id').value.trim().toUpperCase();
+  if (id.length < 3) { toast('กรอก Employee ID อย่างน้อย 3 ตัว', 'error'); return; }
+
+  const { data, error } = await db
+    .from('registrations')
+    .select('registered_at, events(event_title_line1, event_title_line2, event_year)')
+    .eq('employee_id', id)
+    .order('registered_at', { ascending: false });
+
+  if (error) { toast('ค้นหาไม่สำเร็จ: ' + error.message, 'error'); return; }
+
+  const table = $('lookup-table');
+  const empty = $('lookup-empty');
+  const tbody = $('lookup-tbody');
+  tbody.innerHTML = '';
+
+  if (!data || data.length === 0) {
+    table.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  empty.classList.add('hidden');
+  table.classList.remove('hidden');
+  data.forEach((row) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(eventName(row.events))}</td>
+      <td>${formatDateTime(new Date(row.registered_at))}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Realtime (scoped client-side to selected event) ───────────
+function unsubscribeRealtime() {
+  if (state.regChannel) { db.removeChannel(state.regChannel); state.regChannel = null; }
+}
+
+function subscribeRealtime() {
+  unsubscribeRealtime();
   state.regChannel = db
     .channel('registrations-changes')
     .on('postgres_changes',
       { event: '*', schema: 'public', table: 'registrations' },
       (payload) => {
-        if (payload.eventType === 'INSERT') {
-          state.registrations.unshift(payload.new);
-          toast('มีการลงทะเบียนใหม่: ' + payload.new.employee_id, 'success');
-        } else if (payload.eventType === 'DELETE') {
-          state.registrations = state.registrations.filter(
-            r => r.employee_id !== payload.old.employee_id
-          );
+        const ev = payload.new?.event_id ?? payload.old?.event_id;
+        // โหลดใหม่เฉพาะเมื่อเกี่ยวกับงานที่กำลังดู (DELETE อาจไม่มี event_id → โหลดเผื่อไว้)
+        if (ev === undefined || ev === state.selectedEventId) {
+          if (payload.eventType === 'INSERT' && payload.new?.event_id === state.selectedEventId) {
+            toast('มีการลงทะเบียนใหม่: ' + payload.new.employee_id, 'success');
+          }
+          loadRegistrations();
         }
-        renderRegistrations();
-        updateStats();
       })
     .subscribe();
 }
@@ -335,17 +467,14 @@ function subscribeRealtime() {
 function updateStats() {
   const regCount = state.registrations.length;
   const wlCount  = state.whitelist.length;
-  const wlOn     = !!state.config?.whitelist_enabled;
+  const wlOn     = !!selectedEvent()?.whitelist_enabled;
 
   $('stat-registered').textContent = regCount;
   $('stat-whitelist').textContent  = wlOn ? wlCount : '—';
   $('stat-whitelist-foot').textContent = wlOn ? 'Whitelist on' : 'Whitelist off';
-
-  if (wlOn && wlCount > 0) {
-    $('stat-rate').textContent = Math.round((regCount / wlCount) * 100) + '%';
-  } else {
-    $('stat-rate').textContent = '—';
-  }
+  $('stat-rate').textContent = (wlOn && wlCount > 0)
+    ? Math.round((regCount / wlCount) * 100) + '%'
+    : '—';
 }
 
 // ── Helpers ───────────────────────────────────────────────────

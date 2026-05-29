@@ -16,7 +16,11 @@ const state = {
   cameraStream: null,
   facingMode:   'user',
   config:       null,
+  eventId:      null,
+  kiosk:        false,
 };
+
+const KIOSK_RESET_MS = 8000;
 
 let currentLang = 'en';
 
@@ -70,6 +74,46 @@ function goTo(name) {
   });
 
   if (name === 'register') updateProgress();
+
+  // Kiosk: auto-reset countdown เมื่อถึงหน้า success
+  if (state.kiosk) {
+    if (name === 'success') startKioskCountdown();
+    else clearKioskTimer();
+  }
+}
+
+// ── Kiosk Mode ────────────────────────────────────────────────
+let kioskTimer = null;
+let kioskInterval = null;
+
+function startKioskCountdown() {
+  clearKioskTimer();
+  const hint = $('kiosk-hint');
+  const cd   = $('kiosk-countdown');
+  let remain = Math.ceil(KIOSK_RESET_MS / 1000);
+
+  if (hint) hint.classList.remove('hidden');
+  if (cd) cd.textContent = remain;
+
+  kioskInterval = setInterval(() => {
+    remain -= 1;
+    if (cd) cd.textContent = Math.max(remain, 0);
+  }, 1000);
+
+  kioskTimer = setTimeout(resetToWelcome, KIOSK_RESET_MS);
+}
+
+function clearKioskTimer() {
+  if (kioskTimer)    { clearTimeout(kioskTimer);   kioskTimer = null; }
+  if (kioskInterval) { clearInterval(kioskInterval); kioskInterval = null; }
+  const hint = $('kiosk-hint');
+  if (hint) hint.classList.add('hidden');
+}
+
+function resetToWelcome() {
+  clearKioskTimer();
+  resetForm();
+  goTo('welcome');
 }
 
 // ── Progress ─────────────────────────────────────────────────
@@ -137,13 +181,34 @@ function updateOnlineStatus() {
 window.addEventListener('online',  updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 
-// ── Supabase: Load Config ─────────────────────────────────────
-async function loadConfig() {
+// ── Supabase: Resolve active event ────────────────────────────
+// ลำดับความสำคัญ: ?event=<id> ใน URL → app_settings.active_event_id
+async function resolveEventId() {
+  const fromUrl = new URLSearchParams(location.search).get('event');
+  if (fromUrl) return fromUrl;
+
+  const { data, error } = await db
+    .from('app_settings')
+    .select('active_event_id')
+    .eq('id', 1)
+    .single();
+
+  if (error) throw error;
+  return data?.active_event_id || null;
+}
+
+// ── Supabase: Load Event ──────────────────────────────────────
+async function loadEvent() {
   try {
+    const eventId = await resolveEventId();
+    if (!eventId) { goTo('welcome'); return; }
+
+    state.eventId = eventId;
+
     const { data, error } = await db
-      .from('event_config')
+      .from('events')
       .select('*')
-      .eq('id', 1)
+      .eq('id', eventId)
       .single();
 
     if (error) throw error;
@@ -152,7 +217,7 @@ async function loadConfig() {
     applyEventConfig(data);
     goTo(data.registration_open ? 'welcome' : 'closed');
   } catch (err) {
-    console.warn('Config load failed, using defaults:', err.message);
+    console.warn('Event load failed, using defaults:', err.message);
     goTo('welcome');
   }
 }
@@ -187,6 +252,7 @@ async function checkWhitelist(employeeId) {
   const { data, error } = await db
     .from('employees')
     .select('employee_id, name')
+    .eq('event_id', state.eventId)
     .eq('employee_id', employeeId)
     .maybeSingle();
 
@@ -199,6 +265,7 @@ async function checkDuplicate(employeeId) {
   const { data, error } = await db
     .from('registrations')
     .select('employee_id, registered_at')
+    .eq('event_id', state.eventId)
     .eq('employee_id', employeeId)
     .maybeSingle();
 
@@ -333,6 +400,11 @@ async function handleSubmit() {
     return;
   }
 
+  if (!state.eventId) {
+    showToastError(getTranslation('no_event_error') || 'No active event configured.');
+    return;
+  }
+
   submitLabel.classList.add('hidden');
   submitLoader.classList.remove('hidden');
   submitBtn.classList.add('loading');
@@ -361,7 +433,7 @@ async function handleSubmit() {
     // 3. Insert registration
     const { error } = await db
       .from('registrations')
-      .insert({ employee_id: employeeId });
+      .insert({ employee_id: employeeId, event_id: state.eventId });
 
     if (error) throw error;
 
@@ -590,9 +662,16 @@ $('btn-retake').addEventListener('click', () => {
 submitBtn.addEventListener('click', handleSubmit);
 
 $('btn-done').addEventListener('click', async () => {
+  // โหมด kiosk: ไม่ดาวน์โหลดการ์ด (กันไฟล์สะสมที่เครื่องสาธารณะ) แค่รีเซ็ต
+  if (state.kiosk) { resetToWelcome(); return; }
   await saveConfirmationCard();
   resetForm();
   goTo('welcome');
+});
+
+// Kiosk: แตะที่ไหนก็ได้บนหน้า success เพื่อไปต่อทันที
+screens.success?.addEventListener('click', () => {
+  if (state.kiosk) resetToWelcome();
 });
 
 employeeInput.addEventListener('keyup', (e) => {
@@ -635,6 +714,9 @@ const translations = {
     'id_valid_prefix':           'รหัสพนักงาน: ',
     'offline_banner':            'ไม่มีการเชื่อมต่ออินเทอร์เน็ต',
     'offline_submit':            'ไม่มีอินเทอร์เน็ต กรุณาเชื่อมต่อใหม่เพื่อลงทะเบียน',
+    'kiosk_reset_prefix':        'กลับหน้าแรกใน',
+    'kiosk_tap':                 'แตะเพื่อไปต่อ',
+    'no_event_error':            'ยังไม่ได้ตั้งค่างานที่เปิดใช้งาน',
   },
   'en': {
     'welcome_title':             'Welcome to',
@@ -670,6 +752,9 @@ const translations = {
     'id_valid_prefix':           'Employee ID: ',
     'offline_banner':            'No internet connection',
     'offline_submit':            'No internet connection. Please reconnect to register.',
+    'kiosk_reset_prefix':        'Returning in',
+    'kiosk_tap':                 'tap to continue',
+    'no_event_error':            'No active event configured.',
   },
   'vn': {
     'welcome_title':             'Chào mừng đến với',
@@ -705,6 +790,9 @@ const translations = {
     'id_valid_prefix':           'Mã nhân viên: ',
     'offline_banner':            'Không có kết nối internet',
     'offline_submit':            'Không có internet. Vui lòng kết nối lại để đăng ký.',
+    'kiosk_reset_prefix':        'Quay lại sau',
+    'kiosk_tap':                 'chạm để tiếp tục',
+    'no_event_error':            'Chưa có sự kiện nào được kích hoạt.',
   },
   'la': {
     'welcome_title':             'ຍິນດີຕ້ອນຮັບສູ່',
@@ -740,6 +828,9 @@ const translations = {
     'id_valid_prefix':           'ລະຫັດພະນັກງານ: ',
     'offline_banner':            'ບໍ່ມີການເຊື່ອມຕໍ່ອິນເຕີເນັດ',
     'offline_submit':            'ບໍ່ມີອິນເຕີເນັດ. ກະລຸນາເຊື່ອມຕໍ່ໃໝ່ເພື່ອລົງທະບຽນ.',
+    'kiosk_reset_prefix':        'ກັບໄປໜ້າຫຼັກໃນ',
+    'kiosk_tap':                 'ແຕະເພື່ອໄປຕໍ່',
+    'no_event_error':            'ຍັງບໍ່ໄດ້ຕັ້ງຄ່າງານທີ່ເປີດໃຊ້ງານ',
   },
 };
 
@@ -813,9 +904,13 @@ function registerServiceWorker() {
 
 // ── Init ──────────────────────────────────────────────────────
 (function init() {
+  const kioskParam = new URLSearchParams(location.search).get('kiosk');
+  state.kiosk = kioskParam === '1' || kioskParam === 'true';
+  if (state.kiosk) document.body.classList.add('kiosk-mode');
+
   changeLanguage(detectLanguage());
   updateOnlineStatus();
   showCameraState('idle');
   registerServiceWorker();
-  loadConfig();
+  loadEvent();
 })();

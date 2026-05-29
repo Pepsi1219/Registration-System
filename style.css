@@ -980,6 +980,29 @@ img    { display: block; }
 
 .offline-banner.show { transform: translateY(0); }
 
+/* ─── Kiosk countdown hint ────────────────────────────────── */
+.kiosk-hint {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  animation: fade-in 0.4s ease;
+}
+
+.kiosk-hint #kiosk-countdown {
+  color: var(--accent);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* โหมด kiosk: ซ่อนปุ่มเปลี่ยนภาษาบนหน้า success ระหว่างนับถอยหลังไม่จำเป็น
+   แต่ยังคงให้เปลี่ยนภาษาที่หน้า welcome ได้ตามปกติ */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ปรับตำแหน่งบนมือถือ */
 @media (max-width: 640px) {
   .language-switcher {

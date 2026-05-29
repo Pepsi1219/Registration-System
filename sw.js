@@ -6,7 +6,7 @@
    - Supabase API / requests อื่น → network-only (ข้อมูลต้องสด, ห้าม cache)
    ============================================================ */
 
-const CACHE = 'checkin-shell-v1';
+const CACHE = 'checkin-shell-v2';
 
 const SHELL = [
   './',
