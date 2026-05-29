@@ -83,25 +83,28 @@ function updateProgress() {
 
 // ── Employee ID Validation ────────────────────────────────────
 employeeInput.addEventListener('input', () => {
-  const val = employeeInput.value.trim();
-  state.employeeId = val;
+  state.employeeId = employeeInput.value.trim();
+  renderIdValidation();
+  updateProgress();
+});
 
+// แยกออกมาเพื่อให้ changeLanguage เรียกใช้ซ้ำได้ (อัปเดต hint ตามภาษา)
+function renderIdValidation() {
+  const val = state.employeeId;
   if (val.length === 0) {
     setInputState('neutral');
   } else if (val.length < 3) {
-    setInputState('error', 'Employee code must be at least 3 characters');
+    setInputState('error', getTranslation('id_too_short'));
   } else {
-    setInputState('valid', 'Employee ID: ' + val.toUpperCase());
+    setInputState('valid', (getTranslation('id_valid_prefix') || '') + val.toUpperCase());
   }
-
-  updateProgress();
-});
+}
 
 function setInputState(s, hint = null) {
   employeeInput.classList.remove('valid', 'error');
   idStatus.classList.remove('show-ok', 'show-err');
   idHint.classList.remove('error');
-  idHint.textContent = hint || 'Enter 3–10 character code';
+  idHint.textContent = hint || getTranslation('id_hint_default') || 'Enter 3–10 character code';
 
   if (s === 'valid') {
     employeeInput.classList.add('valid');
@@ -117,9 +120,22 @@ function setInputState(s, hint = null) {
 
 // ── Submit Gating ─────────────────────────────────────────────
 function checkSubmitReady() {
-  const ready = state.employeeId.trim().length >= 3 && !!state.photoDataUrl;
+  const ready = state.employeeId.trim().length >= 3
+             && !!state.photoDataUrl
+             && navigator.onLine;
   submitBtn.disabled = !ready;
 }
+
+// ── Network / Offline Awareness ───────────────────────────────
+function updateOnlineStatus() {
+  const offline = !navigator.onLine;
+  const banner = $('offline-banner');
+  if (banner) banner.classList.toggle('show', offline);
+  checkSubmitReady();
+}
+
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
 
 // ── Supabase: Load Config ─────────────────────────────────────
 async function loadConfig() {
@@ -198,7 +214,7 @@ function populateSuccessScreen(employeeId, regDate, isAlreadyRegistered) {
   const dateStr = regDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 
   $('success-avatar').src             = state.photoDataUrl;
-  $('success-id-display').textContent = 'รหัส: ' + employeeId;
+  $('success-id-display').textContent = (getTranslation('id_prefix') || 'ID: ') + employeeId;
   $('card-employee-id').textContent   = employeeId;
   $('card-time').textContent          = timeStr + ' · ' + dateStr;
 
@@ -311,6 +327,11 @@ function triggerFlash() {
 // ── Submit ────────────────────────────────────────────────────
 async function handleSubmit() {
   if (submitBtn.disabled) return;
+
+  if (!navigator.onLine) {
+    showToastError(getTranslation('offline_submit') || 'No internet connection.');
+    return;
+  }
 
   submitLabel.classList.add('hidden');
   submitLoader.classList.remove('hidden');
@@ -603,6 +624,17 @@ const translations = {
     'camera_error_text':         'ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้กล้องในเบราว์เซอร์',
     'closed_title':              'ปิดรับการลงทะเบียน',
     'closed_sub':                'กิจกรรมสิ้นสุดแล้ว ขอบคุณที่เข้าร่วม',
+    'photo_saved_text':          'บันทึกแล้ว',
+    'card_employee_id':          'รหัสพนักงาน',
+    'card_time':                 'เวลาลงทะเบียน',
+    'card_status':               'สถานะ',
+    'completed_text':            'เสร็จสิ้น',
+    'id_prefix':                 'รหัส: ',
+    'id_hint_default':           'กรอกรหัส 3–10 ตัวอักษร',
+    'id_too_short':              'รหัสพนักงานต้องมีอย่างน้อย 3 ตัวอักษร',
+    'id_valid_prefix':           'รหัสพนักงาน: ',
+    'offline_banner':            'ไม่มีการเชื่อมต่ออินเทอร์เน็ต',
+    'offline_submit':            'ไม่มีอินเทอร์เน็ต กรุณาเชื่อมต่อใหม่เพื่อลงทะเบียน',
   },
   'en': {
     'welcome_title':             'Welcome to',
@@ -627,6 +659,17 @@ const translations = {
     'camera_error_text':         'Cannot access camera. Please allow camera permission in your browser.',
     'closed_title':              'Registration Closed',
     'closed_sub':                'This event has concluded. Thank you for participating.',
+    'photo_saved_text':          'Saved',
+    'card_employee_id':          'Employee ID',
+    'card_time':                 'Registration time',
+    'card_status':               'Status',
+    'completed_text':            'Completed',
+    'id_prefix':                 'ID: ',
+    'id_hint_default':           'Enter 3–10 character code',
+    'id_too_short':              'Employee code must be at least 3 characters',
+    'id_valid_prefix':           'Employee ID: ',
+    'offline_banner':            'No internet connection',
+    'offline_submit':            'No internet connection. Please reconnect to register.',
   },
   'vn': {
     'welcome_title':             'Chào mừng đến với',
@@ -651,6 +694,17 @@ const translations = {
     'camera_error_text':         'Không thể truy cập camera. Vui lòng cho phép quyền truy cập camera trong trình duyệt.',
     'closed_title':              'Đã đóng đăng ký',
     'closed_sub':                'Sự kiện đã kết thúc. Cảm ơn bạn đã tham gia.',
+    'photo_saved_text':          'Đã lưu',
+    'card_employee_id':          'Mã nhân viên',
+    'card_time':                 'Thời gian đăng ký',
+    'card_status':               'Trạng thái',
+    'completed_text':            'Hoàn tất',
+    'id_prefix':                 'Mã: ',
+    'id_hint_default':           'Nhập mã 3–10 ký tự',
+    'id_too_short':              'Mã nhân viên phải có ít nhất 3 ký tự',
+    'id_valid_prefix':           'Mã nhân viên: ',
+    'offline_banner':            'Không có kết nối internet',
+    'offline_submit':            'Không có internet. Vui lòng kết nối lại để đăng ký.',
   },
   'la': {
     'welcome_title':             'ຍິນດີຕ້ອນຮັບສູ່',
@@ -675,6 +729,17 @@ const translations = {
     'camera_error_text':         'ບໍ່ສາມາດເຂົ້າຫາກ້ອງໄດ້. ກະລຸນາອະນຸຍາດໃຫ້ໃຊ້ກ້ອງໃນບຣາວເຊີ',
     'closed_title':              'ປິດຮັບການລົງທະບຽນ',
     'closed_sub':                'ກິດຈະກຳສິ້ນສຸດແລ້ວ. ຂອບໃຈທີ່ເຂົ້າຮ່ວມ.',
+    'photo_saved_text':          'ບັນທຶກແລ້ວ',
+    'card_employee_id':          'ລະຫັດພະນັກງານ',
+    'card_time':                 'ເວລາລົງທະບຽນ',
+    'card_status':               'ສະຖານะ',
+    'completed_text':            'ສຳເລັດ',
+    'id_prefix':                 'ລະຫັດ: ',
+    'id_hint_default':           'ປ້ອນລະຫັດ 3–10 ຕົວອັກສອນ',
+    'id_too_short':              'ລະຫັດພະນັກງານຕ້ອງມີຢ່າງໜ້ອຍ 3 ຕົວອັກສອນ',
+    'id_valid_prefix':           'ລະຫັດພະນັກງານ: ',
+    'offline_banner':            'ບໍ່ມີການເຊື່ອມຕໍ່ອິນເຕີເນັດ',
+    'offline_submit':            'ບໍ່ມີອິນເຕີເນັດ. ກະລຸນາເຊື່ອມຕໍ່ໃໝ່ເພື່ອລົງທະບຽນ.',
   },
 };
 
@@ -682,16 +747,75 @@ function getTranslation(key) {
   return translations[currentLang]?.[key] ?? translations['en']?.[key] ?? null;
 }
 
+// เดาภาษาจาก: localStorage → browser → fallback 'en'
+function detectLanguage() {
+  try {
+    const saved = localStorage.getItem('lang');
+    if (saved && translations[saved]) return saved;
+  } catch (_) { /* localStorage อาจถูกปิด */ }
+
+  const nav = (navigator.language || 'en').toLowerCase();
+  if (nav.startsWith('th')) return 'th';
+  if (nav.startsWith('vi')) return 'vn';
+  if (nav.startsWith('lo')) return 'la';
+  return 'en';
+}
+
+const HTML_LANG = { th: 'th', en: 'en', vn: 'vi', la: 'lo' };
+
 function changeLanguage(lang) {
+  if (!translations[lang]) lang = 'en';
   currentLang = lang;
+
+  try { localStorage.setItem('lang', lang); } catch (_) { /* ignore */ }
+  document.documentElement.lang = HTML_LANG[lang] || 'en';
+
+  // แปลข้อความ static ทั้งหมด
   document.querySelectorAll('.lang-text').forEach(el => {
     const key = el.getAttribute('data-key');
-    if (translations[lang]?.[key]) el.innerText = translations[lang][key];
+    const t = translations[lang]?.[key];
+    if (t) el.innerText = t;
+  });
+
+  // ไฮไลต์ปุ่มภาษาที่เลือก
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+  });
+
+  // อัปเดตข้อความ dynamic ที่ไม่ใช่ .lang-text
+  renderIdValidation();
+  refreshSuccessText();
+}
+
+// ข้อความในหน้า success ที่ JS เป็นคนใส่ (prefix รหัส + สถานะ)
+function refreshSuccessText() {
+  if (screens.success?.classList.contains('hidden')) return;
+  const id = state.employeeId.trim().toUpperCase();
+  if (id) {
+    $('success-id-display').textContent = (getTranslation('id_prefix') || 'ID: ') + id;
+  }
+  const statusText = $('card-status-text');
+  if (statusText) {
+    statusText.textContent = getTranslation('status_joined_text') ||
+      `You have already joined the ${getEventName()}`;
+  }
+}
+
+// ── Service Worker (PWA) ──────────────────────────────────────
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol === 'file:') return; // SW ต้องเสิร์ฟผ่าน http/https
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .catch((err) => console.warn('SW registration failed:', err));
   });
 }
 
 // ── Init ──────────────────────────────────────────────────────
 (function init() {
+  changeLanguage(detectLanguage());
+  updateOnlineStatus();
   showCameraState('idle');
+  registerServiceWorker();
   loadConfig();
 })();
