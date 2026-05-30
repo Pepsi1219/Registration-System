@@ -355,10 +355,15 @@ async function startCamera() {
     showCameraState('live');
   } catch (err) {
     console.error('Camera error:', err);
-    showToastError(
-      getTranslation('camera_error_text') ||
-      'Cannot access camera. The photo is optional — you can register without it.'
-    );
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      // Show persistent in-area guidance with a skip button instead of just a toast
+      showCameraState('blocked');
+    } else {
+      showToastError(
+        getTranslation('camera_error_text') ||
+        'Cannot access camera. The photo is optional — you can register without it.'
+      );
+    }
   }
 }
 
@@ -403,6 +408,32 @@ function showCameraState(mode) {
   cameraIdle.classList.toggle('hidden',    mode !== 'idle');
   cameraLive.classList.toggle('hidden',    mode !== 'live');
   cameraPreview.classList.toggle('hidden', mode !== 'preview');
+  const blocked = $('camera-blocked');
+  if (blocked) blocked.classList.toggle('hidden', mode !== 'blocked');
+}
+
+// ── WebView Detection ─────────────────────────────────────────
+// Samsung/Xiaomi QR scanner, WeChat, LINE, Facebook, Instagram all open a
+// webview that cannot display the OS camera-permission dialog.
+function isWebView() {
+  const ua = navigator.userAgent;
+  return /Android/i.test(ua) &&
+    /(wv|WebView|FBAV|FBAN|Instagram|Line;|MicroMessenger|Snapchat)/i.test(ua);
+}
+
+function showWebViewBanner() {
+  // Not needed when running as installed PWA (standalone has proper context)
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  const banner = $('webview-banner');
+  if (banner) banner.classList.remove('hidden');
+}
+
+// ── Skip Photo ────────────────────────────────────────────────
+function skipPhoto() {
+  stopCamera();
+  state.photoDataUrl = null;
+  showCameraState('idle');
+  submitBtn?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function triggerFlash() {
@@ -718,6 +749,25 @@ $('btn-retake').addEventListener('click', () => {
   updateProgress();
 });
 
+// Skip photo (from idle or blocked state) → scroll to submit
+$('btn-skip-photo')?.addEventListener('click', skipPhoto);
+$('btn-skip-photo-blocked')?.addEventListener('click', skipPhoto);
+
+// WebView banner: dismiss or open in Chrome
+$('btn-dismiss-webview')?.addEventListener('click', () => {
+  const banner = $('webview-banner');
+  if (banner) banner.classList.add('hidden');
+});
+
+$('btn-open-chrome')?.addEventListener('click', () => {
+  // Android intent URL: opens the current page in Chrome, falls back to browser default
+  const scheme = location.protocol.replace(':', '');
+  const intent = `intent://${location.host}${location.pathname}${location.search}${location.hash}` +
+    `#Intent;scheme=${scheme};package=com.android.chrome;` +
+    `S.browser_fallback_url=${encodeURIComponent(location.href)};end`;
+  location.href = intent;
+});
+
 submitBtn.addEventListener('click', handleSubmit);
 
 $('btn-done').addEventListener('click', async () => {
@@ -778,6 +828,11 @@ const translations = {
     'kiosk_reset_prefix':        'กลับหน้าแรกใน',
     'kiosk_tap':                 'แตะเพื่อไปต่อ',
     'no_event_error':            'ยังไม่ได้ตั้งค่างานที่เปิดใช้งาน',
+    'webview_banner':            'กล้องอาจไม่ทำงานในเบราว์เซอร์นี้',
+    'webview_open_browser':      'เปิดใน Chrome',
+    'camera_blocked_title':      'ถูกบล็อกการเข้าถึงกล้อง',
+    'camera_blocked_hint':       'ให้สิทธิ์กล้องในการตั้งค่าเบราว์เซอร์ หรือลงทะเบียนโดยไม่ต้องมีรูป',
+    'camera_skip':               'ดำเนินการต่อโดยไม่มีรูปถ่าย',
   },
   'en': {
     'welcome_title':             'Welcome to',
@@ -818,6 +873,11 @@ const translations = {
     'kiosk_reset_prefix':        'Returning in',
     'kiosk_tap':                 'tap to continue',
     'no_event_error':            'No active event configured.',
+    'webview_banner':            'Camera may be blocked in this browser.',
+    'webview_open_browser':      'Open in Chrome',
+    'camera_blocked_title':      'Camera access denied',
+    'camera_blocked_hint':       'Grant camera permission in browser settings, or continue without a photo.',
+    'camera_skip':               'Continue without photo',
   },
   'vn': {
     'welcome_title':             'Chào mừng đến với',
@@ -858,6 +918,11 @@ const translations = {
     'kiosk_reset_prefix':        'Quay lại sau',
     'kiosk_tap':                 'chạm để tiếp tục',
     'no_event_error':            'Chưa có sự kiện nào được kích hoạt.',
+    'webview_banner':            'Camera có thể bị chặn trong trình duyệt này.',
+    'webview_open_browser':      'Mở trong Chrome',
+    'camera_blocked_title':      'Bị từ chối truy cập camera',
+    'camera_blocked_hint':       'Cấp quyền camera trong cài đặt trình duyệt, hoặc tiếp tục không có ảnh.',
+    'camera_skip':               'Tiếp tục không có ảnh',
   },
   'la': {
     'welcome_title':             'ຍິນດີຕ້ອນຮັບສູ່',
@@ -898,6 +963,11 @@ const translations = {
     'kiosk_reset_prefix':        'ກັບໄປໜ້າຫຼັກໃນ',
     'kiosk_tap':                 'ແຕະເພື່ອໄປຕໍ່',
     'no_event_error':            'ຍັງບໍ່ໄດ້ຕັ້ງຄ່າງານທີ່ເປີດໃຊ້ງານ',
+    'webview_banner':            'ກ້ອງອາດຖືກບລັອກໃນໂປຣແກຣມທ່ອງເວັບນີ້.',
+    'webview_open_browser':      'ເປີດໃນ Chrome',
+    'camera_blocked_title':      'ການເຂົ້າຫາກ້ອງຖືກປະຕິເສດ',
+    'camera_blocked_hint':       'ອະນຸຍາດກ້ອງໃນການຕັ້ງຄ່າໂປຣແກຣມທ່ອງເວັບ, ຫຼືດຳເນີນການໂດຍບໍ່ມີຮູບ.',
+    'camera_skip':               'ດຳເນີນການໂດຍບໍ່ມີຮູບຖ່າຍ',
   },
 };
 
@@ -974,6 +1044,8 @@ function registerServiceWorker() {
   const kioskParam = new URLSearchParams(location.search).get('kiosk');
   state.kiosk = kioskParam === '1' || kioskParam === 'true';
   if (state.kiosk) document.body.classList.add('kiosk-mode');
+
+  if (isWebView()) showWebViewBanner();
 
   changeLanguage(detectLanguage());
   updateOnlineStatus();
