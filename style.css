@@ -1295,3 +1295,22 @@ img    { display: block; }
   line-height: 1.65;
   max-width: 220px;
 }
+
+/* ─── Config/loading error: retry button ────────────────────── */
+.config-retry-btn {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 10px 22px;
+  border-radius: 99px;
+  background: rgba(94,159,255,0.15);
+  border: 1px solid rgba(94,159,255,0.35);
+  color: rgba(255,255,255,0.9);
+  font-size: 14px;
+  font-weight: 300;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.config-retry-btn:active { transform: scale(0.96); background: rgba(94,159,255,0.25); }

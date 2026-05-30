@@ -9,7 +9,9 @@
 // ════════════════════════════════════════════════════════════
 function isSupabaseConfigured() {
   const u = window.SUPABASE_URL, k = window.SUPABASE_ANON_KEY;
-  return !!u && !!k && !u.includes('YOUR_') && !k.includes('YOUR_') && /^https?:\/\//.test(u);
+  // Also guard window.supabase: if the CDN failed to load, createClient would throw TypeError
+  return !!window.supabase &&
+    !!u && !!k && !u.includes('YOUR_') && !k.includes('YOUR_') && /^https?:\/\//.test(u);
 }
 
 // สร้าง client เฉพาะเมื่อตั้งค่าแล้ว (กัน createClient throw ตอน URL ไม่ถูกต้อง)
@@ -205,8 +207,25 @@ async function resolveEventId() {
 
 // ── Supabase: Load Event ──────────────────────────────────────
 async function loadEvent() {
+  let timedOut = false;
+  const loadTimeoutId = setTimeout(() => {
+    timedOut = true;
+    const overlay = $('loading-overlay');
+    if (overlay && !overlay.classList.contains('fade-out')) {
+      overlay.innerHTML =
+        '<div class="config-error">' +
+          '<p class="config-error-title">⏱ การเชื่อมต่อช้าเกินไป</p>' +
+          '<p class="config-error-sub">ไม่สามารถเชื่อมต่อ server ได้<br>กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่</p>' +
+          '<button onclick="location.reload()" class="config-retry-btn">ลองใหม่ / Retry</button>' +
+        '</div>';
+    }
+  }, 12000);
+
   try {
     const eventId = await resolveEventId();
+    if (timedOut) return;
+    clearTimeout(loadTimeoutId);
+
     if (!eventId) { goTo('welcome'); return; }
 
     state.eventId = eventId;
@@ -223,8 +242,11 @@ async function loadEvent() {
     applyEventConfig(data);
     goTo(data.registration_open ? 'welcome' : 'closed');
   } catch (err) {
-    console.warn('Event load failed, using defaults:', err.message);
-    goTo('welcome');
+    clearTimeout(loadTimeoutId);
+    if (!timedOut) {
+      console.warn('Event load failed, using defaults:', err.message);
+      goTo('welcome');
+    }
   }
 }
 
@@ -1061,9 +1083,20 @@ function showConfigError() {
   const overlay = $('loading-overlay');
   if (!overlay) return;
   overlay.classList.remove('fade-out');
-  overlay.innerHTML =
-    '<div class="config-error">' +
-      '<p class="config-error-title">⚙️ ยังไม่ได้ตั้งค่า Supabase</p>' +
-      '<p class="config-error-sub">เปิดไฟล์ <code>config.js</code> แล้วใส่ <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> จาก Supabase → Project Settings → API</p>' +
-    '</div>';
+
+  // CDN failure (window.supabase not loaded) vs credentials not configured
+  if (!window.supabase) {
+    overlay.innerHTML =
+      '<div class="config-error">' +
+        '<p class="config-error-title">⚠️ โหลด Library ไม่สำเร็จ</p>' +
+        '<p class="config-error-sub">ไม่สามารถโหลด Supabase ได้<br>กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต แล้วรีเฟรชหน้า</p>' +
+        '<button onclick="location.reload()" class="config-retry-btn">รีเฟรช / Retry</button>' +
+      '</div>';
+  } else {
+    overlay.innerHTML =
+      '<div class="config-error">' +
+        '<p class="config-error-title">⚙️ ยังไม่ได้ตั้งค่า Supabase</p>' +
+        '<p class="config-error-sub">เปิดไฟล์ <code>config.js</code> แล้วใส่ <code>SUPABASE_URL</code> และ <code>SUPABASE_ANON_KEY</code> จาก Supabase → Project Settings → API</p>' +
+      '</div>';
+  }
 }

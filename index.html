@@ -382,6 +382,29 @@
   <!-- Error Toast -->
   <div class="error-toast" id="error-toast" role="alert" aria-live="assertive"></div>
 
+  <!-- Browser compatibility check (ES5 only — must run BEFORE main bundle is parsed)
+       If browser is too old to parse modern JS syntax (?.  ??), this pre-fills the
+       loading overlay so the user sees a helpful message instead of a blank screen. -->
+  <script>
+  (function() {
+    var supported = true;
+    try { (new Function('({})?.x??0'))(); } catch(e) { supported = false; }
+    if (!window.Promise || !window.fetch) supported = false;
+    if (!supported) {
+      var el = document.getElementById('loading-overlay');
+      if (el) el.innerHTML =
+        '<div class="config-error">' +
+          '<p class="config-error-title">Browser not supported</p>' +
+          '<p class="config-error-sub">Please use <strong>Google Chrome</strong> to access this app.' +
+          ' Your current browser is not compatible.</p>' +
+          '<a href="https://play.google.com/store/apps/details?id=com.android.chrome"' +
+             ' class="config-retry-btn"' +
+             ' style="display:inline-block;margin-top:16px;text-decoration:none">Download Chrome</a>' +
+        '</div>';
+    }
+  })();
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="config.js"></script>
   <script src="script.js"></script>
